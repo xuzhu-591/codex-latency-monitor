@@ -42,6 +42,7 @@ export interface Summary {
 export interface StatusReport {
   latest: TurnRecord | null;
   recent: TurnRecord[];
+  trend: TurnRecord[];
   active: ActiveTurn[];
   summary: Summary;
   importedEvents: number;
