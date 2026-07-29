@@ -137,7 +137,7 @@ stateDiagram-v2
 
 - 运行中的 Turn 可在发现首个 Agent 输出后展示预估 TTFT；完成后以原生 TTFT 校正。
 - 只有 `Completed` 且字段齐全的 Turn 进入日汇总。
-- `Aborted` 记录其状态和总等待时长，TTFT/TPS 为 `N/A`，不会污染 p50/p95。
+- `Aborted` 记录其状态和总等待时长，TTFT/TPS 为 `N/A`，不会污染 TTFT p50/p95 或 TPS p50/p5。
 
 ## 7. 存储、隐私与故障恢复
 
@@ -212,7 +212,7 @@ codex-latency-monitor/
 - 含工具调用的 TPS 保留工具等待，不做扣减；
 - 缺少 TTFT、token 或结束时间时返回 `N/A`；
 - 时间异常、零或负分母、未知事件类型；
-- p50/p95 的小样本、偶数样本和空样本；
+- TTFT p50/p95 与 TPS p50/p5 的小样本、偶数样本和空样本；
 - SwiftBar 文本转义与 `N/A` 展示。
 
 ### 10.2 集成测试
