@@ -12,8 +12,8 @@ export function writeReport(dataDirectory: string, report: StatusReport): string
 
 function renderReport(report: StatusReport): string {
   const rows = report.recent.map(renderRow).join("\n") || "<tr><td colspan=\"6\">暂无完成 Turn</td></tr>";
-  const ttftChart = renderChart("近期 TTFT 时序", report.trend, (turn) => turn.ttftMs, "#2563eb", formatMilliseconds);
-  const tpsChart = renderChart("近期 TPS 时序", report.trend, (turn) => turn.tps, "#059669", formatTps);
+  const ttftChart = renderChart("昨日及今日 TTFT 时序", "TTFT", report.trend, (turn) => turn.ttftMs, "#2563eb", formatMilliseconds);
+  const tpsChart = renderChart("昨日及今日 TPS 时序", "TPS", report.trend, (turn) => turn.tps, "#059669", formatTps);
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -24,7 +24,7 @@ function renderReport(report: StatusReport): string {
 body { max-width: 960px; margin: 40px auto; padding: 0 20px; font: 14px -apple-system, BlinkMacSystemFont, sans-serif; color: #18212f; }
 h1 { margin-bottom: 8px; } h2 { margin-top: 32px; } .summary { display: flex; flex-wrap: wrap; gap: 14px; margin: 24px 0; } .card { background: #f3f6fb; border-radius: 10px; padding: 14px; min-width: 130px; }
 .charts { display: grid; gap: 18px; } .chart { border: 1px solid #dde3ee; border-radius: 12px; padding: 16px; background: #fff; } .chart h3 { margin: 0 0 12px; font-size: 15px; } .chart-empty { color: #56627a; margin: 20px 0; }
-svg { display: block; width: 100%; height: auto; } .grid { stroke: #e8edf5; stroke-width: 1; } .axis-label { fill: #6a7588; font-size: 11px; } .line { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; } .point { stroke: #fff; stroke-width: 2; }
+svg { display: block; width: 100%; height: auto; } .grid { stroke: #e8edf5; stroke-width: 1; } .axis-label { fill: #6a7588; font-size: 11px; } .line { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; } .point { stroke: #fff; stroke-width: 2; pointer-events: none; } .point-hit-area { fill: transparent; cursor: default; } .chart-tooltip { position: fixed; z-index: 1; max-width: calc(100vw - 16px); padding: 7px 10px; border-radius: 7px; background: #18212f; color: #fff; font-size: 12px; line-height: 1.4; pointer-events: none; box-shadow: 0 4px 16px rgb(24 33 47 / 20%); }
 table { width: 100%; border-collapse: collapse; } th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #dde3ee; } th { color: #56627a; }
 </style>
 </head>
@@ -40,11 +40,39 @@ table { width: 100%; border-collapse: collapse; } th, td { padding: 10px 8px; te
 <section class="charts">${ttftChart}${tpsChart}</section>
 <h2>最近 10 轮</h2>
 <table><thead><tr><th>完成时间</th><th>会话</th><th>TTFT</th><th>TPS</th><th>总时长</th><th>工具</th></tr></thead><tbody>${rows}</tbody></table>
+<div class="chart-tooltip" data-chart-tooltip hidden></div>
+<script>
+(() => {
+  const tooltip = document.querySelector("[data-chart-tooltip]");
+  if (!(tooltip instanceof HTMLElement)) return;
+
+  const positionTooltip = (event) => {
+    const gap = 12;
+    const left = Math.max(8, Math.min(event.clientX + gap, window.innerWidth - tooltip.offsetWidth - 8));
+    const top = Math.max(8, Math.min(event.clientY + gap, window.innerHeight - tooltip.offsetHeight - 8));
+    tooltip.style.left = left + "px";
+    tooltip.style.top = top + "px";
+  };
+
+  for (const point of document.querySelectorAll("[data-chart-point]")) {
+    point.addEventListener("pointerenter", (event) => {
+      tooltip.textContent = point.dataset.time + " · " + point.dataset.metric + " " + point.dataset.value;
+      tooltip.hidden = false;
+      positionTooltip(event);
+    });
+    point.addEventListener("pointermove", positionTooltip);
+    point.addEventListener("pointerleave", () => {
+      tooltip.hidden = true;
+    });
+  }
+})();
+</script>
 </body></html>`;
 }
 
 function renderChart(
   title: string,
+  metricLabel: string,
   turns: TurnRecord[],
   valueOf: (turn: TurnRecord) => number | null,
   color: string,
@@ -88,8 +116,9 @@ function renderChart(
   }).join("");
   const circles = points.map((point, index) => {
     const { x, y } = coordinate(point, index);
-    const detail = `${new Date(point.turn.completedAtMs).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })} · ${format(point.value)}`;
-    return `<circle class="point" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${color}"><title>${escapeHtml(detail)}</title></circle>`;
+    const detail = `${formatDateTime(point.turn.completedAtMs)} · ${metricLabel} ${format(point.value)}`;
+    const data = `data-chart-point data-time="${escapeHtml(formatDateTime(point.turn.completedAtMs))}" data-metric="${escapeHtml(metricLabel)}" data-value="${escapeHtml(format(point.value))}"`;
+    return `<circle class="point-hit-area" ${data} cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="10"><title>${escapeHtml(detail)}</title></circle><circle class="point" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${color}"/>`;
   }).join("");
   const firstTime = new Date(points[0].turn.completedAtMs).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
   const lastTime = new Date(points.at(-1)?.turn.completedAtMs ?? points[0].turn.completedAtMs).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -99,6 +128,18 @@ function renderChart(
 
 function renderRow(turn: TurnRecord): string {
   return `<tr><td>${escapeHtml(new Date(turn.completedAtMs).toLocaleString("zh-CN"))}</td><td>${escapeHtml(turn.sessionKey)}</td><td>${formatMilliseconds(turn.ttftMs)}</td><td>${formatTps(turn.tps)}</td><td>${formatMilliseconds(turn.durationMs)}</td><td>${turn.hasTool ? "是" : "否"}</td></tr>`;
+}
+
+function formatDateTime(atMs: number): string {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(new Date(atMs));
 }
 
 function escapeHtml(value: string): string {
