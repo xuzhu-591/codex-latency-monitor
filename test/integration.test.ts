@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { buildStatus } from "../src/cli/status.js";
+import { buildStatus, formatSwiftBar } from "../src/cli/status.js";
 import { refreshSessions } from "../src/ingest/ingest.js";
 import { writeReport } from "../src/report/report.js";
 import { MonitorDatabase, defaultDatabasePath } from "../src/storage/database.js";
@@ -71,6 +71,29 @@ test("趋势图仅包含昨天零点至当前的完成 Turn", async () => {
   } finally {
     database.close();
   }
+});
+
+test("菜单栏仅在存在不可计算 Turn 时显示 N/A 数量", () => {
+  const text = formatSwiftBar({
+    latest: null,
+    recent: [],
+    trend: [],
+    active: [],
+    summary: {
+      completedCount: 3,
+      unavailableCount: 1,
+      p50TtftMs: 2_000,
+      p95TtftMs: 4_000,
+      p50Tps: 10,
+      p95Tps: 20,
+    },
+    importedEvents: 0,
+    diagnostics: [],
+  });
+
+  assert.match(text, /今天 · 3 轮 · N\/A 1/);
+  assert.match(text, /TTFT p50 2\.0s · p95 4\.0s/);
+  assert.match(text, /TPS p50 10\.0\/s · p95 20\.0\/s/);
 });
 
 function turn(turnId: string, completedAtMs: number, status: "completed" | "aborted" = "completed") {

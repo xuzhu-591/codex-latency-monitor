@@ -42,9 +42,10 @@ export function formatSwiftBar(report: StatusReport): string {
   }
 
   lines.push("---");
-  lines.push(`今天 · ${report.summary.completedCount} 轮 | disabled=true`);
-  lines.push(`p50 TTFT ${formatMilliseconds(report.summary.p50TtftMs)} · p95 ${formatMilliseconds(report.summary.p95TtftMs)} | disabled=true`);
-  lines.push(`p50 TPS ${formatTps(report.summary.p50Tps)} · N/A ${report.summary.unavailableCount} | disabled=true`);
+  const unavailable = report.summary.unavailableCount === 0 ? "" : ` · N/A ${report.summary.unavailableCount}`;
+  lines.push(`今天 · ${report.summary.completedCount} 轮${unavailable} | disabled=true`);
+  lines.push(`TTFT p50 ${formatMilliseconds(report.summary.p50TtftMs)} · p95 ${formatMilliseconds(report.summary.p95TtftMs)} | disabled=true`);
+  lines.push(`TPS p50 ${formatTps(report.summary.p50Tps)} · p95 ${formatTps(report.summary.p95Tps)} | disabled=true`);
   if (report.diagnostics.length > 0) {
     lines.push("---");
     lines.push(`诊断：${escapeMenuText(report.diagnostics[0])} | color=red`);
@@ -62,6 +63,7 @@ function summarize(turns: TurnRecord[]): Summary {
     p50TtftMs: percentile(ttft, 0.5),
     p95TtftMs: percentile(ttft, 0.95),
     p50Tps: percentile(tps, 0.5),
+    p95Tps: percentile(tps, 0.95),
   };
 }
 
