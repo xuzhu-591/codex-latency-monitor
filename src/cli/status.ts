@@ -8,7 +8,7 @@ export function buildStatus(
   diagnostics: string[],
   nowMs = Date.now(),
 ): StatusReport {
-  const recent = database.listRecent(10);
+  const recent = database.listRecent(50);
   const completedToday = database.listCompletedSince(startOfLocalDay(nowMs));
   const trend = database.listCompletedSince(startOfPreviousLocalDay(nowMs))
     .filter((turn) => turn.status === "completed" && turn.completedAtMs <= nowMs);
@@ -33,10 +33,11 @@ export function formatSwiftBar(report: StatusReport): string {
   }
 
   lines.push("最近 10 轮 | disabled=true");
-  if (report.recent.length === 0) {
+  const menuRecent = report.recent.slice(0, 10);
+  if (menuRecent.length === 0) {
     lines.push("暂无完成 Turn | disabled=true");
   } else {
-    for (const turn of report.recent) {
+    for (const turn of menuRecent) {
       lines.push(formatTurn(turn));
     }
   }

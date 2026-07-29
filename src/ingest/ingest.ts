@@ -133,7 +133,7 @@ function finalizeTurn(
 
   const record: TurnRecord = {
     turnId,
-    sessionKey: pending.sessionKey,
+    sessionId: pending.sessionId,
     startedAtMs: pending.startedAtMs,
     completedAtMs,
     durationMs: metric.durationMs,

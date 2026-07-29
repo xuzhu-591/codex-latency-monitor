@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { createHash } from "node:crypto";
 import type { ActiveTurn, PendingTurn, TurnRecord } from "../domain/types.js";
 
@@ -13,6 +13,7 @@ export class MonitorDatabase {
     this.#database.pragma("journal_mode = WAL");
     this.#database.pragma("foreign_keys = ON");
     this.#migrate();
+    this.#migrateSessionIds();
   }
 
   close(): void {
@@ -44,7 +45,7 @@ export class MonitorDatabase {
       INSERT INTO pending_turns (turn_id, source_path, session_key, started_at_ms)
       VALUES (?, ?, ?, ?)
       ON CONFLICT(turn_id) DO NOTHING
-    `).run(turnId, sourcePath, sessionKey(sourcePath), startedAtMs);
+    `).run(turnId, sourcePath, sessionId(sourcePath), startedAtMs);
   }
 
   markFirstAgentEvent(sourcePath: string, atMs: number): void {
@@ -113,7 +114,7 @@ export class MonitorDatabase {
         status = excluded.status
     `).run(
       record.turnId,
-      record.sessionKey,
+      record.sessionId,
       record.startedAtMs,
       record.completedAtMs,
       record.durationMs,
@@ -147,7 +148,7 @@ export class MonitorDatabase {
     `).all() as PendingRow[];
     return rows.map((row) => ({
       turnId: row.turn_id,
-      sessionKey: row.session_key,
+      sessionId: row.session_key,
       startedAtMs: row.started_at_ms,
       estimatedTtftMs: row.first_agent_at_ms === null ? null : Math.max(0, row.first_agent_at_ms - row.started_at_ms),
       hasTool: Boolean(row.has_tool),
@@ -188,13 +189,37 @@ export class MonitorDatabase {
         ON turns(completed_at_ms DESC);
     `);
   }
+
+  #migrateSessionIds(): void {
+    const sourceFiles = this.#database.prepare("SELECT source_path FROM source_files")
+      .all() as Array<{ source_path: string }>;
+    const updateTurns = this.#database.prepare("UPDATE turns SET session_key = ? WHERE session_key = ?");
+    const updatePendingTurns = this.#database.prepare("UPDATE pending_turns SET session_key = ? WHERE session_key = ?");
+
+    this.#database.transaction(() => {
+      for (const sourceFile of sourceFiles) {
+        const legacyKey = legacySessionKey(sourceFile.source_path);
+        const id = sessionId(sourceFile.source_path);
+        if (id === legacyKey) {
+          continue;
+        }
+        updateTurns.run(id, legacyKey);
+        updatePendingTurns.run(id, legacyKey);
+      }
+    })();
+  }
 }
 
 export function defaultDatabasePath(dataDirectory: string): string {
   return join(dataDirectory, "monitor.db");
 }
 
-function sessionKey(sourcePath: string): string {
+function sessionId(sourcePath: string): string {
+  const match = basename(sourcePath).match(/-([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})\.jsonl$/i);
+  return match?.[1] ?? "N/A";
+}
+
+function legacySessionKey(sourcePath: string): string {
   return createHash("sha256").update(sourcePath).digest("hex").slice(0, 8);
 }
 
@@ -225,7 +250,7 @@ function mapPending(row: PendingRow): PendingTurn {
   return {
     turnId: row.turn_id,
     sourcePath: row.source_path,
-    sessionKey: row.session_key,
+    sessionId: row.session_key,
     startedAtMs: row.started_at_ms,
     firstAgentAtMs: row.first_agent_at_ms,
     outputTokens: row.output_tokens,
@@ -236,7 +261,7 @@ function mapPending(row: PendingRow): PendingTurn {
 function mapTurn(row: TurnRow): TurnRecord {
   return {
     turnId: row.turn_id,
-    sessionKey: row.session_key,
+    sessionId: row.session_key,
     startedAtMs: row.started_at_ms,
     completedAtMs: row.completed_at_ms,
     durationMs: row.duration_ms,

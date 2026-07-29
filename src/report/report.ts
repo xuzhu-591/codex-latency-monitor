@@ -38,8 +38,8 @@ table { width: 100%; border-collapse: collapse; } th, td { padding: 10px 8px; te
   <div class="card">p50 TPS<br><strong>${formatTps(report.summary.p50Tps)}</strong></div>
 </section>
 <section class="charts">${ttftChart}${tpsChart}</section>
-<h2>最近 10 轮</h2>
-<table><thead><tr><th>完成时间</th><th>会话</th><th>TTFT</th><th>TPS</th><th>总时长</th><th>工具</th></tr></thead><tbody>${rows}</tbody></table>
+<h2>最近 50 轮</h2>
+<table><thead><tr><th>完成时间</th><th>会话 ID</th><th>TTFT</th><th>TPS</th><th>总时长</th><th>工具</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="chart-tooltip" data-chart-tooltip hidden></div>
 <script>
 (() => {
@@ -127,7 +127,7 @@ function renderChart(
 }
 
 function renderRow(turn: TurnRecord): string {
-  return `<tr><td>${escapeHtml(new Date(turn.completedAtMs).toLocaleString("zh-CN"))}</td><td>${escapeHtml(turn.sessionKey)}</td><td>${formatMilliseconds(turn.ttftMs)}</td><td>${formatTps(turn.tps)}</td><td>${formatMilliseconds(turn.durationMs)}</td><td>${turn.hasTool ? "是" : "否"}</td></tr>`;
+  return `<tr><td>${escapeHtml(new Date(turn.completedAtMs).toLocaleString("zh-CN"))}</td><td>${escapeHtml(turn.sessionId)}</td><td>${formatMilliseconds(turn.ttftMs)}</td><td>${formatTps(turn.tps)}</td><td>${formatMilliseconds(turn.durationMs)}</td><td>${turn.hasTool ? "是" : "否"}</td></tr>`;
 }
 
 function formatDateTime(atMs: number): string {

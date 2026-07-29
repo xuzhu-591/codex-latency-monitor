@@ -3,7 +3,7 @@ export type TurnStatus = "completed" | "aborted";
 export interface PendingTurn {
   turnId: string;
   sourcePath: string;
-  sessionKey: string;
+  sessionId: string;
   startedAtMs: number;
   firstAgentAtMs: number | null;
   outputTokens: number;
@@ -12,7 +12,7 @@ export interface PendingTurn {
 
 export interface TurnRecord {
   turnId: string;
-  sessionKey: string;
+  sessionId: string;
   startedAtMs: number;
   completedAtMs: number;
   durationMs: number | null;
@@ -25,7 +25,7 @@ export interface TurnRecord {
 
 export interface ActiveTurn {
   turnId: string;
-  sessionKey: string;
+  sessionId: string;
   startedAtMs: number;
   estimatedTtftMs: number | null;
   hasTool: boolean;
