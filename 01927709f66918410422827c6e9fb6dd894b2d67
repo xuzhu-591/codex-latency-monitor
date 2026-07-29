@@ -1,0 +1,83 @@
+docs/metrics-guide.md
+  9aa291def3568ff7 1-75
+src/domain/types.ts
+  9aa291def3568ff7 40
+src/report/report.ts
+  9aa291def3568ff7 39
+test/e2e.test.ts
+  9aa291def3568ff7 35,51
+docs/technical-design.md
+  9aa291def3568ff7 140,215
+docs/design.md
+  9aa291def3568ff7 55
+README.md
+  9aa291def3568ff7 54
+src/cli/status.ts
+  9aa291def3568ff7 49,67
+test/integration.test.ts
+  9aa291def3568ff7 90,98,101-115,173-178,187
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9.preview.3",
+  "base_commit_sha": "01927709f66918410422827c6e9fb6dd894b2d67",
+  "prompts": {
+    "9aa291def3568ff7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fa939-c7cf-7842-97a0-72b6c0072806",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Xu Zhu <xu.zhu.hi@outlook.com>",
+      "messages": [],
+      "total_additions": 111,
+      "total_deletions": 11,
+      "accepted_lines": 111,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "README.md": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "src/domain/types.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "src/report/report.ts": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "test/integration.test.ts": {
+          "additions": 26,
+          "deletions": 4,
+          "accepted_lines": 26
+        },
+        "docs/design.md": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "docs/technical-design.md": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "src/cli/status.ts": {
+          "additions": 2,
+          "deletions": 2,
+          "accepted_lines": 2
+        },
+        "test/e2e.test.ts": {
+          "additions": 2,
+          "deletions": 1,
+          "accepted_lines": 2
+        },
+        "docs/metrics-guide.md": {
+          "additions": 75,
+          "accepted_lines": 75
+        }
+      }
+    }
+  }
+}
