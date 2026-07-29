@@ -1,0 +1,86 @@
+src/storage/database.ts
+  9aa291def3568ff7 3,16,48,117,151,192-210,217-219,222,253,264
+src/domain/types.ts
+  9aa291def3568ff7 6,15,28
+test/e2e.test.ts
+  9aa291def3568ff7 27,38,51
+src/cli/status.ts
+  9aa291def3568ff7 11,36-37,40
+test/integration.test.ts
+  9aa291def3568ff7 2,4,101-153,159
+README.md
+  9aa291def3568ff7 40
+test/helpers.ts
+  9aa291def3568ff7 9
+src/ingest/ingest.ts
+  9aa291def3568ff7 136
+src/report/report.ts
+  9aa291def3568ff7 41-42,130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9.preview.3",
+  "base_commit_sha": "9415b8574b4dbcaa8c58f37f5b5799abf62975e7",
+  "prompts": {
+    "9aa291def3568ff7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fa939-c7cf-7842-97a0-72b6c0072806",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Xu Zhu <xu.zhu.hi@outlook.com>",
+      "messages": [],
+      "total_additions": 107,
+      "total_deletions": 23,
+      "accepted_lines": 106,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "src/domain/types.ts": {
+          "additions": 3,
+          "deletions": 3,
+          "accepted_lines": 3
+        },
+        "test/e2e.test.ts": {
+          "additions": 3,
+          "deletions": 2,
+          "accepted_lines": 3
+        },
+        "src/storage/database.ts": {
+          "additions": 33,
+          "deletions": 8,
+          "accepted_lines": 32
+        },
+        "src/cli/status.ts": {
+          "additions": 4,
+          "deletions": 3,
+          "accepted_lines": 4
+        },
+        "README.md": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "src/ingest/ingest.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        },
+        "test/integration.test.ts": {
+          "additions": 58,
+          "deletions": 1,
+          "accepted_lines": 58
+        },
+        "src/report/report.ts": {
+          "additions": 3,
+          "deletions": 3,
+          "accepted_lines": 3
+        },
+        "test/helpers.ts": {
+          "additions": 1,
+          "deletions": 1,
+          "accepted_lines": 1
+        }
+      }
+    }
+  }
+}
