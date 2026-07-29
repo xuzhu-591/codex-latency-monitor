@@ -37,6 +37,7 @@ export interface Summary {
   p50TtftMs: number | null;
   p95TtftMs: number | null;
   p50Tps: number | null;
+  p95Tps: number | null;
 }
 
 export interface StatusReport {

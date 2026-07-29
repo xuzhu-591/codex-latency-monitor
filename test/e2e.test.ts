@@ -30,6 +30,10 @@ test("E2E：从 JSONL 到 CLI、SwiftBar 文本和本地报告", async () => {
 
   const swiftbar = run([plugin], childEnvironment);
   assert.match(swiftbar.stdout, /^Codex · TTFT 2\.0s · TPS 2\.5\/s/m);
+  assert.match(swiftbar.stdout, /今天 · 1 轮 \| disabled=true/);
+  assert.match(swiftbar.stdout, /TTFT p50 2\.0s · p95 2\.0s/);
+  assert.match(swiftbar.stdout, /TPS p50 2\.5\/s · p95 2\.5\/s/);
+  assert.doesNotMatch(swiftbar.stdout, /N\/A/);
   assert.match(swiftbar.stdout, /打开本地报告/);
   assert.doesNotMatch(swiftbar.stdout, new RegExp(parsed.latest.sessionKey));
 
