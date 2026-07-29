@@ -37,6 +37,8 @@ node bin/codex-latency.mjs doctor
 
 运行时数据位于：`~/Library/Application Support/CodexLatencyMonitor/`。
 
+本地 HTML 报告会展示最近 100 个完成 Turn 的 TTFT 与 TPS 时序图；会话短标识仅在报告表格中展示，不出现在菜单栏。
+
 ## 验证
 
 ```bash

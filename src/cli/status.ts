@@ -10,9 +10,11 @@ export function buildStatus(
 ): StatusReport {
   const recent = database.listRecent(10);
   const completedToday = database.listCompletedSince(startOfLocalDay(nowMs));
+  const trend = database.listRecent(100).reverse();
   return {
     latest: recent[0] ?? null,
     recent,
+    trend,
     active: database.listActive(nowMs),
     summary: summarize(completedToday),
     importedEvents,
@@ -77,7 +79,7 @@ function formatTurn(turn: TurnRecord): string {
   });
   const tool = turn.hasTool ? " · 工具" : "";
   const state = turn.status === "aborted" ? "中止" : `TTFT ${formatMilliseconds(turn.ttftMs)} · TPS ${formatTps(turn.tps)}`;
-  return `${completedAt} · ${turn.sessionKey} · ${state}${tool} | disabled=true`;
+  return `${completedAt} · ${state}${tool} | disabled=true`;
 }
 
 function startOfLocalDay(nowMs: number): number {

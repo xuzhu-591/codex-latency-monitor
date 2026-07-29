@@ -24,17 +24,22 @@ test("E2E：从 JSONL 到 CLI、SwiftBar 文本和本地报告", async () => {
   };
 
   const status = run([cli, "status", "--format", "json"], childEnvironment);
-  const parsed = JSON.parse(status.stdout) as { latest: { ttftMs: number; tps: number } };
+  const parsed = JSON.parse(status.stdout) as { latest: { ttftMs: number; tps: number; sessionKey: string } };
   assert.equal(parsed.latest.ttftMs, 2_000);
   assert.equal(parsed.latest.tps, 2.5);
 
   const swiftbar = run([plugin], childEnvironment);
   assert.match(swiftbar.stdout, /^Codex · TTFT 2\.0s · TPS 2\.5\/s/m);
   assert.match(swiftbar.stdout, /打开本地报告/);
+  assert.doesNotMatch(swiftbar.stdout, new RegExp(parsed.latest.sessionKey));
 
   const report = run([cli, "report"], childEnvironment);
   const reportPath = report.stdout.trim();
-  assert.doesNotMatch(await readFile(reportPath, "utf8"), new RegExp(privateText));
+  const html = await readFile(reportPath, "utf8");
+  assert.match(html, /近期 TTFT 时序/);
+  assert.match(html, /近期 TPS 时序/);
+  assert.match(html, /<svg/);
+  assert.doesNotMatch(html, new RegExp(privateText));
 });
 
 function run(argumentsList: string[], environment: NodeJS.ProcessEnv) {
