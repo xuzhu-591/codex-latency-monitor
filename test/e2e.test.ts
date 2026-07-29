@@ -13,7 +13,7 @@ test("E2E：从 JSONL 到 CLI、SwiftBar 文本和本地报告", async () => {
   const environment = await createTestEnvironment("codex-latency-e2e");
   const privateText = "e2e-private-message";
   await writeLines(environment.log, [
-    ...completedTurnLines("e2e-turn"),
+    ...completedTurnLines("e2e-turn", Date.now() - 20_000),
     event("2026-07-01T00:01:00.000Z", "event_msg", { type: "agent_message", message: privateText }),
   ]);
   const childEnvironment = {
@@ -36,9 +36,14 @@ test("E2E：从 JSONL 到 CLI、SwiftBar 文本和本地报告", async () => {
   const report = run([cli, "report"], childEnvironment);
   const reportPath = report.stdout.trim();
   const html = await readFile(reportPath, "utf8");
-  assert.match(html, /近期 TTFT 时序/);
-  assert.match(html, /近期 TPS 时序/);
+  assert.match(html, /昨日及今日 TTFT 时序/);
+  assert.match(html, /昨日及今日 TPS 时序/);
   assert.match(html, /<svg/);
+  assert.match(html, /data-chart-tooltip/);
+  assert.match(html, /data-chart-point/);
+  assert.match(html, /data-metric="TTFT"/);
+  assert.match(html, /data-value="2\.0s"/);
+  assert.match(html, /pointerenter/);
   assert.doesNotMatch(html, new RegExp(privateText));
 });
 

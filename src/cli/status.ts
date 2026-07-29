@@ -10,7 +10,8 @@ export function buildStatus(
 ): StatusReport {
   const recent = database.listRecent(10);
   const completedToday = database.listCompletedSince(startOfLocalDay(nowMs));
-  const trend = database.listRecent(100).reverse();
+  const trend = database.listCompletedSince(startOfPreviousLocalDay(nowMs))
+    .filter((turn) => turn.status === "completed" && turn.completedAtMs <= nowMs);
   return {
     latest: recent[0] ?? null,
     recent,
@@ -85,6 +86,11 @@ function formatTurn(turn: TurnRecord): string {
 function startOfLocalDay(nowMs: number): number {
   const now = new Date(nowMs);
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+}
+
+function startOfPreviousLocalDay(nowMs: number): number {
+  const now = new Date(nowMs);
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
 }
 
 function escapeMenuText(value: string): string {

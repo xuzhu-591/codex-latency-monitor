@@ -54,3 +54,36 @@ test("工具 Turn 保留等待时间，报告不泄露消息正文", async () =>
     database.close();
   }
 });
+
+test("趋势图仅包含昨天零点至当前的完成 Turn", async () => {
+  const environment = await createTestEnvironment("codex-latency-trend-period");
+  const database = new MonitorDatabase(defaultDatabasePath(environment.data));
+  const now = new Date(2026, 6, 2, 12, 0, 0).getTime();
+  try {
+    database.completeTurn(turn("older", new Date(2026, 5, 30, 23, 59, 59).getTime()));
+    database.completeTurn(turn("yesterday", new Date(2026, 6, 1, 0, 0, 0).getTime()));
+    database.completeTurn(turn("aborted", new Date(2026, 6, 1, 6, 0, 0).getTime(), "aborted"));
+    database.completeTurn(turn("today", new Date(2026, 6, 2, 11, 59, 59).getTime()));
+    database.completeTurn(turn("future", new Date(2026, 6, 3, 0, 0, 0).getTime()));
+
+    const report = buildStatus(database, 0, [], now);
+    assert.deepEqual(report.trend.map((record) => record.turnId), ["yesterday", "today"]);
+  } finally {
+    database.close();
+  }
+});
+
+function turn(turnId: string, completedAtMs: number, status: "completed" | "aborted" = "completed") {
+  return {
+    turnId,
+    sessionKey: "test-session",
+    startedAtMs: completedAtMs - 5_000,
+    completedAtMs,
+    durationMs: 5_000,
+    ttftMs: 1_000,
+    outputTokens: 10,
+    tps: 2.5,
+    hasTool: false,
+    status,
+  };
+}
