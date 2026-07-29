@@ -6,7 +6,7 @@ export async function createTestEnvironment(prefix: string): Promise<{ root: str
   const root = await mkdtemp(join(tmpdir(), `${prefix}-`));
   const sessions = join(root, "sessions", "2026", "07", "01");
   const data = join(root, "data");
-  const log = join(sessions, "rollout-fixture.jsonl");
+  const log = join(sessions, "rollout-2026-07-01T00-00-00-019fa939-c7cf-7842-97a0-72b6c0072806.jsonl");
   await mkdir(sessions, { recursive: true });
   await mkdir(data, { recursive: true });
   return { root, sessions: join(root, "sessions"), data, log };

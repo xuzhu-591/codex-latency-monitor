@@ -24,7 +24,7 @@ test("E2E：从 JSONL 到 CLI、SwiftBar 文本和本地报告", async () => {
   };
 
   const status = run([cli, "status", "--format", "json"], childEnvironment);
-  const parsed = JSON.parse(status.stdout) as { latest: { ttftMs: number; tps: number; sessionKey: string } };
+  const parsed = JSON.parse(status.stdout) as { latest: { ttftMs: number; tps: number; sessionId: string } };
   assert.equal(parsed.latest.ttftMs, 2_000);
   assert.equal(parsed.latest.tps, 2.5);
 
@@ -35,7 +35,7 @@ test("E2E：从 JSONL 到 CLI、SwiftBar 文本和本地报告", async () => {
   assert.match(swiftbar.stdout, /TPS p50 2\.5\/s · p95 2\.5\/s/);
   assert.doesNotMatch(swiftbar.stdout, /N\/A/);
   assert.match(swiftbar.stdout, /打开本地报告/);
-  assert.doesNotMatch(swiftbar.stdout, new RegExp(parsed.latest.sessionKey));
+  assert.doesNotMatch(swiftbar.stdout, new RegExp(parsed.latest.sessionId));
 
   const report = run([cli, "report"], childEnvironment);
   const reportPath = report.stdout.trim();
@@ -48,6 +48,7 @@ test("E2E：从 JSONL 到 CLI、SwiftBar 文本和本地报告", async () => {
   assert.match(html, /data-metric="TTFT"/);
   assert.match(html, /data-value="2\.0s"/);
   assert.match(html, /pointerenter/);
+  assert.match(html, new RegExp(parsed.latest.sessionId));
   assert.doesNotMatch(html, new RegExp(privateText));
 });
 

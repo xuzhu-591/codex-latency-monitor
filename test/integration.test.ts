@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import Database from "better-sqlite3";
 import test from "node:test";
 import { buildStatus, formatSwiftBar } from "../src/cli/status.js";
 import { refreshSessions } from "../src/ingest/ingest.js";
@@ -96,10 +98,65 @@ test("菜单栏仅在存在不可计算 Turn 时显示 N/A 数量", () => {
   assert.match(text, /TPS p50 10\.0\/s · p95 20\.0\/s/);
 });
 
+test("报告使用真实会话 ID，并将旧路径 hash 迁移为会话 ID", async () => {
+  const environment = await createTestEnvironment("codex-latency-session-id");
+  const databasePath = defaultDatabasePath(environment.data);
+  const sourcePath = "/tmp/rollout-2026-07-01T00-00-00-019fa939-c7cf-7842-97a0-72b6c0072806.jsonl";
+  const sessionId = "019fa939-c7cf-7842-97a0-72b6c0072806";
+  const legacyKey = createHash("sha256").update(sourcePath).digest("hex").slice(0, 8);
+  const initial = new MonitorDatabase(databasePath);
+  initial.close();
+
+  const legacy = new Database(databasePath);
+  legacy.prepare("INSERT INTO source_files (source_path, offset_bytes, updated_at_ms) VALUES (?, ?, ?)")
+    .run(sourcePath, 0, 0);
+  legacy.prepare(`
+    INSERT INTO turns (
+      turn_id, session_key, started_at_ms, completed_at_ms, duration_ms,
+      ttft_ms, output_tokens, tps, has_tool, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run("legacy-turn", legacyKey, 1_000, 2_000, 1_000, 100, 10, 10, 0, "completed");
+  legacy.close();
+
+  const migrated = new MonitorDatabase(databasePath);
+  try {
+    assert.equal(migrated.listRecent(1)[0]?.sessionId, sessionId);
+    migrated.startTurn("new-turn", sourcePath, 3_000);
+    assert.equal(migrated.getPending("new-turn")?.sessionId, sessionId);
+  } finally {
+    migrated.close();
+  }
+});
+
+test("报告展示最近 50 轮，SwiftBar 仍只展示最近 10 轮", async () => {
+  const environment = await createTestEnvironment("codex-latency-report-limit");
+  const database = new MonitorDatabase(defaultDatabasePath(environment.data));
+  const now = Date.now();
+  try {
+    for (let index = 0; index < 55; index += 1) {
+      database.completeTurn(turn(`turn-${index}`, now - index * 1_000));
+    }
+
+    const report = buildStatus(database, 0, [], now);
+    assert.equal(report.recent.length, 50);
+    const reportPath = writeReport(environment.data, report);
+    assert.match(await readFile(reportPath, "utf8"), /最近 50 轮/);
+
+    const menuTurns = formatSwiftBar(report)
+      .split("最近 10 轮 | disabled=true\n")[1]
+      .split("---")[0]
+      .trim()
+      .split("\n");
+    assert.equal(menuTurns.length, 10);
+  } finally {
+    database.close();
+  }
+});
+
 function turn(turnId: string, completedAtMs: number, status: "completed" | "aborted" = "completed") {
   return {
     turnId,
-    sessionKey: "test-session",
+    sessionId: "test-session",
     startedAtMs: completedAtMs - 5_000,
     completedAtMs,
     durationMs: 5_000,
