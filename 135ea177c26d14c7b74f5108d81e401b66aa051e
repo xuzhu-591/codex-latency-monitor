@@ -1,0 +1,35 @@
+docs/design.md
+  9aa291def3568ff7 1-116
+docs/technical-design.md
+  9aa291def3568ff7 1-273
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9.preview.3",
+  "base_commit_sha": "135ea177c26d14c7b74f5108d81e401b66aa051e",
+  "prompts": {
+    "9aa291def3568ff7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fa939-c7cf-7842-97a0-72b6c0072806",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Xu Zhu <xu.zhu.hi@outlook.com>",
+      "messages": [],
+      "total_additions": 389,
+      "total_deletions": 0,
+      "accepted_lines": 389,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "docs/design.md": {
+          "additions": 116,
+          "accepted_lines": 116
+        },
+        "docs/technical-design.md": {
+          "additions": 273,
+          "accepted_lines": 273
+        }
+      }
+    }
+  }
+}
