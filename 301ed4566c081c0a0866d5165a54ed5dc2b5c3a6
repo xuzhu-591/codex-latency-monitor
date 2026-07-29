@@ -1,0 +1,56 @@
+src/cli/status.ts
+  9aa291def3568ff7 13,17,82
+src/report/report.ts
+  9aa291def3568ff7 15-16,25-27,40,46-97
+test/e2e.test.ts
+  9aa291def3568ff7 27,34,38-42
+src/domain/types.ts
+  9aa291def3568ff7 45
+README.md
+  9aa291def3568ff7 40-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9.preview.3",
+  "base_commit_sha": "301ed4566c081c0a0866d5165a54ed5dc2b5c3a6",
+  "prompts": {
+    "9aa291def3568ff7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fa939-c7cf-7842-97a0-72b6c0072806",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Xu Zhu <xu.zhu.hi@outlook.com>",
+      "messages": [],
+      "total_additions": 78,
+      "total_deletions": 9,
+      "accepted_lines": 73,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "README.md": {
+          "additions": 2,
+          "accepted_lines": 2
+        },
+        "src/cli/status.ts": {
+          "additions": 4,
+          "deletions": 2,
+          "accepted_lines": 3
+        },
+        "src/domain/types.ts": {
+          "additions": 1,
+          "accepted_lines": 1
+        },
+        "test/e2e.test.ts": {
+          "additions": 9,
+          "deletions": 4,
+          "accepted_lines": 7
+        },
+        "src/report/report.ts": {
+          "additions": 62,
+          "deletions": 3,
+          "accepted_lines": 60
+        }
+      }
+    }
+  }
+}
