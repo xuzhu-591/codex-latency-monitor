@@ -1,0 +1,30 @@
+{
+  "name": "codex-latency-monitor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "被动读取本地 Codex 会话日志的 TTFT 与 TPS 监控工具",
+  "type": "module",
+  "bin": {
+    "codex-latency": "bin/codex-latency.mjs"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "npm run typecheck",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "test:integration": "npm run build && node --test dist/test/integration.test.js",
+    "test:e2e": "npm run build && node --test dist/test/e2e.test.js",
+    "install:swiftbar": "node scripts/install-swiftbar.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.8.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
