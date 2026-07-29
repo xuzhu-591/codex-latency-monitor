@@ -51,6 +51,7 @@ npm run test:e2e
 端到端测试使用临时目录和人工构造的脱敏 JSONL，不会读取真实会话。
 
 完整架构、数据边界和测试策略见 [技术设计](docs/technical-design.md)。
+各项指标的定义、适用范围和排查方式见 [指标解读](docs/metrics-guide.md)。
 
 ## 许可证
 

@@ -36,6 +36,7 @@ table { width: 100%; border-collapse: collapse; } th, td { padding: 10px 8px; te
   <div class="card">p50 TTFT<br><strong>${formatMilliseconds(report.summary.p50TtftMs)}</strong></div>
   <div class="card">p95 TTFT<br><strong>${formatMilliseconds(report.summary.p95TtftMs)}</strong></div>
   <div class="card">p50 TPS<br><strong>${formatTps(report.summary.p50Tps)}</strong></div>
+  <div class="card">p5 TPS<br><strong>${formatTps(report.summary.p5Tps)}</strong></div>
 </section>
 <section class="charts">${ttftChart}${tpsChart}</section>
 <h2>最近 50 轮</h2>

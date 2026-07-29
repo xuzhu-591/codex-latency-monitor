@@ -87,7 +87,7 @@ test("菜单栏仅在存在不可计算 Turn 时显示 N/A 数量", () => {
       p50TtftMs: 2_000,
       p95TtftMs: 4_000,
       p50Tps: 10,
-      p95Tps: 20,
+      p5Tps: 5,
     },
     importedEvents: 0,
     diagnostics: [],
@@ -95,7 +95,24 @@ test("菜单栏仅在存在不可计算 Turn 时显示 N/A 数量", () => {
 
   assert.match(text, /今天 · 3 轮 · N\/A 1/);
   assert.match(text, /TTFT p50 2\.0s · p95 4\.0s/);
-  assert.match(text, /TPS p50 10\.0\/s · p95 20\.0\/s/);
+  assert.match(text, /TPS p50 10\.0\/s · p5 5\.0\/s/);
+});
+
+test("TPS 汇总使用低分位 p5 表示慢输出", async () => {
+  const environment = await createTestEnvironment("codex-latency-tps-p5");
+  const database = new MonitorDatabase(defaultDatabasePath(environment.data));
+  const now = new Date(2026, 6, 2, 12, 0, 0).getTime();
+  try {
+    for (let index = 1; index <= 10; index += 1) {
+      database.completeTurn(turn(`tps-${index}`, now - index * 1_000, "completed", index * 10));
+    }
+
+    const report = buildStatus(database, 0, [], now);
+    assert.equal(report.summary.p50Tps, 55);
+    assert.equal(report.summary.p5Tps, 14.5);
+  } finally {
+    database.close();
+  }
 });
 
 test("报告使用真实会话 ID，并将旧路径 hash 迁移为会话 ID", async () => {
@@ -153,7 +170,12 @@ test("报告展示最近 50 轮，SwiftBar 仍只展示最近 10 轮", async () 
   }
 });
 
-function turn(turnId: string, completedAtMs: number, status: "completed" | "aborted" = "completed") {
+function turn(
+  turnId: string,
+  completedAtMs: number,
+  status: "completed" | "aborted" = "completed",
+  tps = 2.5,
+) {
   return {
     turnId,
     sessionId: "test-session",
@@ -162,7 +184,7 @@ function turn(turnId: string, completedAtMs: number, status: "completed" | "abor
     durationMs: 5_000,
     ttftMs: 1_000,
     outputTokens: 10,
-    tps: 2.5,
+    tps,
     hasTool: false,
     status,
   };
