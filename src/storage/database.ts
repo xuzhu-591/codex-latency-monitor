@@ -14,7 +14,7 @@ export class MonitorDatabase {
     this.#database.pragma("foreign_keys = ON");
     this.#migrate();
     this.#migrateProvider();
-    this.#migrateEffectiveTps();
+    this.#migrateTps();
     this.#migrateSessionIds();
   }
 
@@ -161,7 +161,7 @@ export class MonitorDatabase {
       record.durationMs,
       record.ttftMs,
       record.outputTokens,
-      record.effectiveTps,
+      record.tps,
       Number(record.hasTool),
       record.status,
       record.provider,
@@ -251,10 +251,10 @@ export class MonitorDatabase {
     this.#ensureColumn("turns", "provider", "TEXT NOT NULL DEFAULT 'codex'");
   }
 
-  #migrateEffectiveTps(): void {
+  #migrateTps(): void {
     const row = this.#database.prepare("SELECT value FROM monitor_metadata WHERE key = 'metric_definition'")
       .get() as { value: string } | undefined;
-    if (row?.value === "effective-tps-v2") {
+    if (row) {
       return;
     }
     this.#database.transaction(() => {
@@ -266,7 +266,7 @@ export class MonitorDatabase {
         END
       `).run();
       this.#database.prepare(`
-        INSERT INTO monitor_metadata (key, value) VALUES ('metric_definition', 'effective-tps-v2')
+        INSERT INTO monitor_metadata (key, value) VALUES ('metric_definition', 'tps-v2')
         ON CONFLICT(key) DO UPDATE SET value = excluded.value
       `).run();
     })();
@@ -363,7 +363,7 @@ function mapTurn(row: TurnRow): TurnRecord {
     durationMs: row.duration_ms,
     ttftMs: row.ttft_ms,
     outputTokens: row.output_tokens,
-    effectiveTps: row.tps,
+    tps: row.tps,
     hasTool: Boolean(row.has_tool),
     status: row.status,
   };

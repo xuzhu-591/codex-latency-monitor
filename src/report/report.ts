@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { formatEffectiveTps, formatMilliseconds } from "../domain/metrics.js";
+import { formatMilliseconds, formatTps } from "../domain/metrics.js";
 import type { Provider, StatusReport, TurnRecord } from "../domain/types.js";
 
 export function writeReport(dataDirectory: string, report: StatusReport): string {
@@ -13,7 +13,7 @@ export function writeReport(dataDirectory: string, report: StatusReport): string
 function renderReport(report: StatusReport): string {
   const rows = report.recent.map(renderRow).join("\n") || "<tr><td colspan=\"7\">暂无完成 Turn</td></tr>";
   const ttftChart = renderChart("昨日及今日 TTFT 时序", "TTFT", report.trend, (turn) => turn.ttftMs, "#2563eb", formatMilliseconds);
-  const tpsChart = renderChart("昨日及今日 Effective TPS 时序", "Effective TPS", report.trend, (turn) => turn.effectiveTps, "#059669", formatEffectiveTps);
+  const tpsChart = renderChart("昨日及今日 TPS 时序", "TPS", report.trend, (turn) => turn.tps, "#059669", formatTps);
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -36,12 +36,12 @@ table { width: 100%; border-collapse: collapse; } th, td { padding: 10px 8px; te
   <div class="card">完成 Turn<br><strong>${report.summary.completedCount}</strong></div>
   <div class="card">p50 TTFT<br><strong>${formatMilliseconds(report.summary.p50TtftMs)}</strong></div>
   <div class="card">p95 TTFT<br><strong>${formatMilliseconds(report.summary.p95TtftMs)}</strong></div>
-  <div class="card">p50 Effective TPS<br><strong>${formatEffectiveTps(report.summary.p50EffectiveTps)}</strong></div>
-  <div class="card">p5 Effective TPS<br><strong>${formatEffectiveTps(report.summary.p5EffectiveTps)}</strong></div>
+  <div class="card">p50 TPS<br><strong>${formatTps(report.summary.p50Tps)}</strong></div>
+  <div class="card">p5 TPS<br><strong>${formatTps(report.summary.p5Tps)}</strong></div>
 </section>
 <section class="charts">${ttftChart}${tpsChart}</section>
 <h2>最近 50 轮</h2>
-<table><thead><tr><th>完成时间</th><th>来源</th><th>会话 ID</th><th>TTFT</th><th>Effective TPS</th><th>总时长</th><th>工具</th></tr></thead><tbody>${rows}</tbody></table>
+<table><thead><tr><th>完成时间</th><th>来源</th><th>会话 ID</th><th>TTFT</th><th>TPS</th><th>总时长</th><th>工具</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="chart-tooltip" data-chart-tooltip hidden></div>
 <script>
 (() => {
@@ -133,7 +133,7 @@ function renderChart(
 }
 
 function renderRow(turn: TurnRecord): string {
-  return `<tr><td>${escapeHtml(new Date(turn.completedAtMs).toLocaleString("zh-CN"))}</td><td>${providerBadge(turn.provider)}</td><td>${escapeHtml(turn.sessionId)}</td><td>${formatMilliseconds(turn.ttftMs)}</td><td>${formatEffectiveTps(turn.effectiveTps)}</td><td>${formatMilliseconds(turn.durationMs)}</td><td>${turn.hasTool ? "是" : "否"}</td></tr>`;
+  return `<tr><td>${escapeHtml(new Date(turn.completedAtMs).toLocaleString("zh-CN"))}</td><td>${providerBadge(turn.provider)}</td><td>${escapeHtml(turn.sessionId)}</td><td>${formatMilliseconds(turn.ttftMs)}</td><td>${formatTps(turn.tps)}</td><td>${formatMilliseconds(turn.durationMs)}</td><td>${turn.hasTool ? "是" : "否"}</td></tr>`;
 }
 
 function providerBadge(provider: Provider): string {

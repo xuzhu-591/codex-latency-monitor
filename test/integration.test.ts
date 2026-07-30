@@ -35,7 +35,7 @@ test("增量导入、部分行重试和重复刷新不会重复统计", async ()
   }
 });
 
-test("工具 Turn 的 Effective TPS 包含全部等待，报告不泄露消息正文", async () => {
+test("工具 Turn 的 TPS 包含全部等待，报告不泄露消息正文", async () => {
   const environment = await createTestEnvironment("codex-latency-privacy");
   const secret = "fixture-secret-must-not-persist";
   await writeLines(environment.log, [
@@ -50,7 +50,7 @@ test("工具 Turn 的 Effective TPS 包含全部等待，报告不泄露消息�
     await refreshSessions(database, environment.sessions);
     const report = buildStatus(database, 0, []);
     assert.equal(report.latest?.hasTool, true);
-    assert.equal(report.latest?.effectiveTps, 20 / 11);
+    assert.equal(report.latest?.tps, 20 / 11);
     const path = writeReport(environment.data, report);
     assert.doesNotMatch(await readFile(path, "utf8"), new RegExp(secret));
   } finally {
@@ -76,7 +76,7 @@ test("趋势图仅包含昨天零点至当前的完成 Turn", async () => {
   }
 });
 
-test("菜单栏仅在存在不可计算 Turn 时显示 N/A 数量", () => {
+test("菜单栏按来源展示当天汇总与 N/A 数量", () => {
   const text = formatSwiftBar({
     latest: null,
     recent: [],
@@ -87,19 +87,41 @@ test("菜单栏仅在存在不可计算 Turn 时显示 N/A 数量", () => {
       unavailableCount: 1,
       p50TtftMs: 2_000,
       p95TtftMs: 4_000,
-      p50EffectiveTps: 10,
-      p5EffectiveTps: 5,
+      p50Tps: 10,
+      p5Tps: 5,
+    },
+    providerSummaries: {
+      codex: {
+        completedCount: 2,
+        unavailableCount: 1,
+        p50TtftMs: 2_000,
+        p95TtftMs: 4_000,
+        p50Tps: 10,
+        p5Tps: 5,
+      },
+      claude: {
+        completedCount: 1,
+        unavailableCount: 0,
+        p50TtftMs: 3_000,
+        p95TtftMs: 3_000,
+        p50Tps: 8,
+        p5Tps: 8,
+      },
     },
     importedEvents: 0,
     diagnostics: [],
   });
 
-  assert.match(text, /今天 · 3 轮 · N\/A 1/);
+  assert.match(text, /今天 · 3 轮/);
+  assert.match(text, /Codex · 2 轮 · N\/A 1/);
   assert.match(text, /TTFT p50 2\.0s · p95 4\.0s/);
-  assert.match(text, /Effective TPS p50 10\.0\/s · p5 5\.0\/s/);
+  assert.match(text, /TPS p50 10\.0\/s · p5 5\.0\/s/);
+  assert.match(text, /Claude · 1 轮/);
+  assert.match(text, /TTFT p50 3\.0s · p95 3\.0s/);
+  assert.match(text, /TPS p50 8\.0\/s · p5 8\.0\/s/);
 });
 
-test("Effective TPS 汇总使用低分位 p5 表示慢输出", async () => {
+test("TPS 汇总使用低分位 p5 表示慢输出", async () => {
   const environment = await createTestEnvironment("codex-latency-tps-p5");
   const database = new MonitorDatabase(defaultDatabasePath(environment.data));
   const now = new Date(2026, 6, 2, 12, 0, 0).getTime();
@@ -109,8 +131,8 @@ test("Effective TPS 汇总使用低分位 p5 表示慢输出", async () => {
     }
 
     const report = buildStatus(database, 0, [], now);
-    assert.equal(report.summary.p50EffectiveTps, 55);
-    assert.equal(report.summary.p5EffectiveTps, 14.5);
+    assert.equal(report.summary.p50Tps, 55);
+    assert.equal(report.summary.p5Tps, 14.5);
   } finally {
     database.close();
   }
@@ -240,7 +262,7 @@ test("Claude 主会话按用户输入重建 Turn，排除工具结果、子代�
       durationMs: 10_000,
       ttftMs: 2_000,
       outputTokens: 25,
-      effectiveTps: 2.5,
+      tps: 2.5,
       hasTool: true,
       status: "completed",
     });
@@ -264,8 +286,8 @@ test("未安装 Claude Code 时跳过其日志目录，不影响刷新", async (
   }
 });
 
-test("已有历史 Turn 在升级后重新计算 Effective TPS", async () => {
-  const environment = await createTestEnvironment("codex-latency-effective-tps-migration");
+test("已有历史 Turn 在升级后重新计算 TPS", async () => {
+  const environment = await createTestEnvironment("codex-latency-tps-migration");
   const databasePath = defaultDatabasePath(environment.data);
   const initial = new MonitorDatabase(databasePath);
   initial.close();
@@ -282,7 +304,7 @@ test("已有历史 Turn 在升级后重新计算 Effective TPS", async () => {
 
   const migrated = new MonitorDatabase(databasePath);
   try {
-    assert.equal(migrated.listRecent(1)[0]?.effectiveTps, 2);
+    assert.equal(migrated.listRecent(1)[0]?.tps, 2);
   } finally {
     migrated.close();
   }
@@ -292,7 +314,7 @@ function turn(
   turnId: string,
   completedAtMs: number,
   status: "completed" | "aborted" = "completed",
-  effectiveTps = 2.5,
+  tps = 2.5,
 ) {
   return {
     turnId,
@@ -303,7 +325,7 @@ function turn(
     durationMs: 5_000,
     ttftMs: 1_000,
     outputTokens: 10,
-    effectiveTps,
+    tps,
     hasTool: false,
     status,
   };

@@ -41,7 +41,7 @@ export async function runCli(argumentsList: string[], environment = process.env)
         return JSON.stringify(report, null, 2);
       }
       return report.latest
-        ? `${providerName(report.latest.provider)} · TTFT ${report.latest.ttftMs ?? "N/A"}ms · Effective TPS ${report.latest.effectiveTps?.toFixed(1) ?? "N/A"}/s\n`
+        ? `${providerName(report.latest.provider)} · TTFT ${report.latest.ttftMs ?? "N/A"}ms · TPS ${report.latest.tps?.toFixed(1) ?? "N/A"}/s\n`
         : "暂无完成 Turn\n";
     }
     if (command === "report") {

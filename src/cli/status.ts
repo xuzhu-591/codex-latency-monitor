@@ -1,4 +1,4 @@
-import { formatEffectiveTps, formatMilliseconds, percentile } from "../domain/metrics.js";
+import { formatMilliseconds, formatTps, percentile } from "../domain/metrics.js";
 import type { Provider, StatusReport, Summary, TurnRecord } from "../domain/types.js";
 import { MonitorDatabase } from "../storage/database.js";
 
@@ -18,6 +18,10 @@ export function buildStatus(
     trend,
     active: database.listActive(nowMs),
     summary: summarize(completedToday),
+    providerSummaries: {
+      codex: summarize(completedToday.filter((turn) => turn.provider === "codex")),
+      claude: summarize(completedToday.filter((turn) => turn.provider === "claude")),
+    },
     importedEvents,
     diagnostics,
   };
@@ -43,10 +47,9 @@ export function formatSwiftBar(report: StatusReport): string {
   }
 
   lines.push("---");
-  const unavailable = report.summary.unavailableCount === 0 ? "" : ` · N/A ${report.summary.unavailableCount}`;
-  lines.push(`今天 · ${report.summary.completedCount} 轮${unavailable} | disabled=true`);
-  lines.push(`TTFT p50 ${formatMilliseconds(report.summary.p50TtftMs)} · p95 ${formatMilliseconds(report.summary.p95TtftMs)} | disabled=true`);
-  lines.push(`Effective TPS p50 ${formatEffectiveTps(report.summary.p50EffectiveTps)} · p5 ${formatEffectiveTps(report.summary.p5EffectiveTps)} | disabled=true`);
+  lines.push(`今天 · ${report.summary.completedCount} 轮 | disabled=true`);
+  appendProviderSummary(lines, "codex", report.providerSummaries.codex);
+  appendProviderSummary(lines, "claude", report.providerSummaries.claude);
   if (report.diagnostics.length > 0) {
     lines.push("---");
     lines.push(`诊断：${escapeMenuText(report.diagnostics[0])} | color=red`);
@@ -57,14 +60,14 @@ export function formatSwiftBar(report: StatusReport): string {
 function summarize(turns: TurnRecord[]): Summary {
   const completed = turns.filter((turn) => turn.status === "completed");
   const ttft = completed.flatMap((turn) => turn.ttftMs === null ? [] : [turn.ttftMs]);
-  const effectiveTps = completed.flatMap((turn) => turn.effectiveTps === null ? [] : [turn.effectiveTps]);
+  const tps = completed.flatMap((turn) => turn.tps === null ? [] : [turn.tps]);
   return {
     completedCount: completed.length,
-    unavailableCount: completed.filter((turn) => turn.ttftMs === null || turn.effectiveTps === null).length,
+    unavailableCount: completed.filter((turn) => turn.ttftMs === null || turn.tps === null).length,
     p50TtftMs: percentile(ttft, 0.5),
     p95TtftMs: percentile(ttft, 0.95),
-    p50EffectiveTps: percentile(effectiveTps, 0.5),
-    p5EffectiveTps: percentile(effectiveTps, 0.05),
+    p50Tps: percentile(tps, 0.5),
+    p5Tps: percentile(tps, 0.05),
   };
 }
 
@@ -72,7 +75,7 @@ function headline(latest: TurnRecord | null): string {
   if (!latest) {
     return "Codex · 等待完成 Turn";
   }
-  return `${providerName(latest.provider)} · TTFT ${formatMilliseconds(latest.ttftMs)} · Effective TPS ${formatEffectiveTps(latest.effectiveTps)}`;
+  return `${providerName(latest.provider)} · TTFT ${formatMilliseconds(latest.ttftMs)} · TPS ${formatTps(latest.tps)}`;
 }
 
 function formatTurn(turn: TurnRecord): string {
@@ -84,12 +87,22 @@ function formatTurn(turn: TurnRecord): string {
   const tool = turn.hasTool ? " · 工具" : "";
   const state = turn.status === "aborted"
     ? "中止"
-    : `TTFT ${formatMilliseconds(turn.ttftMs)} · Effective TPS ${formatEffectiveTps(turn.effectiveTps)}`;
+    : `TTFT ${formatMilliseconds(turn.ttftMs)} · TPS ${formatTps(turn.tps)}`;
   return `${completedAt} · ${providerName(turn.provider)} · ${state}${tool} | disabled=true`;
 }
 
 function providerName(provider: Provider): string {
   return provider === "claude" ? "Claude" : "Codex";
+}
+
+function appendProviderSummary(lines: string[], provider: Provider, summary: Summary): void {
+  if (summary.completedCount === 0) {
+    return;
+  }
+  const unavailable = summary.unavailableCount === 0 ? "" : ` · N/A ${summary.unavailableCount}`;
+  lines.push(`${providerName(provider)} · ${summary.completedCount} 轮${unavailable} | disabled=true`);
+  lines.push(`TTFT p50 ${formatMilliseconds(summary.p50TtftMs)} · p95 ${formatMilliseconds(summary.p95TtftMs)} | disabled=true`);
+  lines.push(`TPS p50 ${formatTps(summary.p50Tps)} · p5 ${formatTps(summary.p5Tps)} | disabled=true`);
 }
 
 function startOfLocalDay(nowMs: number): number {
