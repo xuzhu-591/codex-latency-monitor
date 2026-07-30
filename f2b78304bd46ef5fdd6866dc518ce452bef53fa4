@@ -1,0 +1,37 @@
+test/integration.test.ts
+  9aa291def3568ff7 79-91
+src/cli/status.ts
+  9aa291def3568ff7 12,17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8-ntes.9.preview.3",
+  "base_commit_sha": "f2b78304bd46ef5fdd6866dc518ce452bef53fa4",
+  "prompts": {
+    "9aa291def3568ff7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fa939-c7cf-7842-97a0-72b6c0072806",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "Xu Zhu <xu.zhu.hi@outlook.com>",
+      "messages": [],
+      "total_additions": 25,
+      "total_deletions": 7,
+      "accepted_lines": 19,
+      "overriden_lines": 0,
+      "per_file_stats": {
+        "test/integration.test.ts": {
+          "additions": 23,
+          "deletions": 6,
+          "accepted_lines": 17
+        },
+        "src/cli/status.ts": {
+          "additions": 2,
+          "deletions": 1,
+          "accepted_lines": 2
+        }
+      }
+    }
+  }
+}
