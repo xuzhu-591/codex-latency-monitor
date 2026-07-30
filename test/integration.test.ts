@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
 import Database from "better-sqlite3";
 import test from "node:test";
 import { buildStatus, formatSwiftBar } from "../src/cli/status.js";
-import { refreshSessions } from "../src/ingest/ingest.js";
+import { refreshClaudeSessions, refreshSessions } from "../src/ingest/ingest.js";
 import { writeReport } from "../src/report/report.js";
 import { MonitorDatabase, defaultDatabasePath } from "../src/storage/database.js";
-import { appendRaw, completedTurnLines, createTestEnvironment, event, writeLines } from "./helpers.js";
+import { appendRaw, claudeEvent, completedTurnLines, createTestEnvironment, event, writeLines } from "./helpers.js";
 
 test("增量导入、部分行重试和重复刷新不会重复统计", async () => {
   const environment = await createTestEnvironment("codex-latency-integration");
@@ -34,7 +35,7 @@ test("增量导入、部分行重试和重复刷新不会重复统计", async ()
   }
 });
 
-test("工具 Turn 保留等待时间，报告不泄露消息正文", async () => {
+test("工具 Turn 的 Effective TPS 包含全部等待，报告不泄露消息正文", async () => {
   const environment = await createTestEnvironment("codex-latency-privacy");
   const secret = "fixture-secret-must-not-persist";
   await writeLines(environment.log, [
@@ -49,7 +50,7 @@ test("工具 Turn 保留等待时间，报告不泄露消息正文", async () =>
     await refreshSessions(database, environment.sessions);
     const report = buildStatus(database, 0, []);
     assert.equal(report.latest?.hasTool, true);
-    assert.equal(report.latest?.tps, 2);
+    assert.equal(report.latest?.effectiveTps, 20 / 11);
     const path = writeReport(environment.data, report);
     assert.doesNotMatch(await readFile(path, "utf8"), new RegExp(secret));
   } finally {
@@ -86,8 +87,8 @@ test("菜单栏仅在存在不可计算 Turn 时显示 N/A 数量", () => {
       unavailableCount: 1,
       p50TtftMs: 2_000,
       p95TtftMs: 4_000,
-      p50Tps: 10,
-      p5Tps: 5,
+      p50EffectiveTps: 10,
+      p5EffectiveTps: 5,
     },
     importedEvents: 0,
     diagnostics: [],
@@ -95,10 +96,10 @@ test("菜单栏仅在存在不可计算 Turn 时显示 N/A 数量", () => {
 
   assert.match(text, /今天 · 3 轮 · N\/A 1/);
   assert.match(text, /TTFT p50 2\.0s · p95 4\.0s/);
-  assert.match(text, /TPS p50 10\.0\/s · p5 5\.0\/s/);
+  assert.match(text, /Effective TPS p50 10\.0\/s · p5 5\.0\/s/);
 });
 
-test("TPS 汇总使用低分位 p5 表示慢输出", async () => {
+test("Effective TPS 汇总使用低分位 p5 表示慢输出", async () => {
   const environment = await createTestEnvironment("codex-latency-tps-p5");
   const database = new MonitorDatabase(defaultDatabasePath(environment.data));
   const now = new Date(2026, 6, 2, 12, 0, 0).getTime();
@@ -108,8 +109,8 @@ test("TPS 汇总使用低分位 p5 表示慢输出", async () => {
     }
 
     const report = buildStatus(database, 0, [], now);
-    assert.equal(report.summary.p50Tps, 55);
-    assert.equal(report.summary.p5Tps, 14.5);
+    assert.equal(report.summary.p50EffectiveTps, 55);
+    assert.equal(report.summary.p5EffectiveTps, 14.5);
   } finally {
     database.close();
   }
@@ -170,21 +171,139 @@ test("报告展示最近 50 轮，SwiftBar 仍只展示最近 10 轮", async () 
   }
 });
 
+test("Claude 主会话按用户输入重建 Turn，排除工具结果、子代理与边车事件", async () => {
+  const environment = await createTestEnvironment("codex-latency-claude");
+  const sessionId = "18613844-dc4d-4728-862f-b5d1535c5b08";
+  const secret = "claude-fixture-secret-must-not-persist";
+  const startedAtMs = Date.parse("2026-07-01T00:00:00.000Z");
+  await writeLines(environment.claudeLog, [
+    claudeEvent(new Date(startedAtMs).toISOString(), "user", {
+      sessionId,
+      uuid: "user-event-1",
+      message: { role: "user", content: secret },
+    }),
+    claudeEvent(new Date(startedAtMs + 2_000).toISOString(), "assistant", {
+      sessionId,
+      uuid: "assistant-thinking-1",
+      message: { role: "assistant", id: "thinking-1", content: [{ type: "thinking" }], usage: { output_tokens: 0 } },
+    }),
+    claudeEvent(new Date(startedAtMs + 4_000).toISOString(), "assistant", {
+      sessionId,
+      uuid: "assistant-tool-1",
+      message: { role: "assistant", id: "tool-1", content: [{ type: "tool_use" }], usage: { output_tokens: 3 }, stop_reason: "tool_use" },
+    }),
+    claudeEvent(new Date(startedAtMs + 5_000).toISOString(), "assistant", {
+      sessionId,
+      uuid: "assistant-tool-2",
+      message: { role: "assistant", id: "tool-1", content: [{ type: "tool_use" }], usage: { output_tokens: 5 }, stop_reason: "tool_use" },
+    }),
+    claudeEvent(new Date(startedAtMs + 6_000).toISOString(), "user", {
+      sessionId,
+      uuid: "tool-result-event",
+      message: { role: "user", content: [{ type: "tool_result", content: secret }] },
+    }),
+    claudeEvent(new Date(startedAtMs + 10_000).toISOString(), "assistant", {
+      sessionId,
+      uuid: "assistant-answer-1",
+      message: { role: "assistant", id: "answer-1", content: [{ type: "text" }], usage: { output_tokens: 20 }, stop_reason: "end_turn" },
+    }),
+    claudeEvent(new Date(startedAtMs + 11_000).toISOString(), "user", {
+      sessionId,
+      uuid: "sidechain-user",
+      isSidechain: true,
+      message: { role: "user", content: "不应计入" },
+    }),
+  ]);
+  const subagentDirectory = join(environment.claudeProjects, "-tmp-project", "subagents");
+  await mkdir(subagentDirectory, { recursive: true });
+  await writeLines(join(subagentDirectory, "subagent.jsonl"), [
+    claudeEvent(new Date(startedAtMs).toISOString(), "user", {
+      sessionId: "subagent-session",
+      uuid: "subagent-user",
+      message: { role: "user", content: "不应计入" },
+    }),
+  ]);
+
+  const database = new MonitorDatabase(defaultDatabasePath(environment.data));
+  try {
+    const result = await refreshClaudeSessions(database, environment.claudeProjects);
+    assert.equal(result.diagnostics.length, 0);
+    assert.equal(result.importedEvents, 7);
+    const report = buildStatus(database, 0, [], startedAtMs + 20_000);
+    assert.equal(report.recent.length, 1);
+    assert.deepEqual(report.latest, {
+      turnId: `claude:${sessionId}:user-event-1`,
+      sessionId,
+      provider: "claude",
+      startedAtMs,
+      completedAtMs: startedAtMs + 10_000,
+      durationMs: 10_000,
+      ttftMs: 2_000,
+      outputTokens: 25,
+      effectiveTps: 2.5,
+      hasTool: true,
+      status: "completed",
+    });
+    const reportPath = writeReport(environment.data, report);
+    const html = await readFile(reportPath, "utf8");
+    assert.match(html, /◆ Claude/);
+    assert.doesNotMatch(html, new RegExp(secret));
+  } finally {
+    database.close();
+  }
+});
+
+test("未安装 Claude Code 时跳过其日志目录，不影响刷新", async () => {
+  const environment = await createTestEnvironment("codex-latency-claude-missing");
+  const database = new MonitorDatabase(defaultDatabasePath(environment.data));
+  try {
+    const result = await refreshClaudeSessions(database, join(environment.root, "no-claude-projects"));
+    assert.deepEqual(result, { importedEvents: 0, diagnostics: [] });
+  } finally {
+    database.close();
+  }
+});
+
+test("已有历史 Turn 在升级后重新计算 Effective TPS", async () => {
+  const environment = await createTestEnvironment("codex-latency-effective-tps-migration");
+  const databasePath = defaultDatabasePath(environment.data);
+  const initial = new MonitorDatabase(databasePath);
+  initial.close();
+
+  const legacy = new Database(databasePath);
+  legacy.prepare("DELETE FROM monitor_metadata WHERE key = 'metric_definition'").run();
+  legacy.prepare(`
+    INSERT INTO turns (
+      turn_id, session_key, started_at_ms, completed_at_ms, duration_ms,
+      ttft_ms, output_tokens, tps, has_tool, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run("old-tps-turn", "test-session", 0, 10_000, 10_000, 2_000, 20, 2.5, 0, "completed");
+  legacy.close();
+
+  const migrated = new MonitorDatabase(databasePath);
+  try {
+    assert.equal(migrated.listRecent(1)[0]?.effectiveTps, 2);
+  } finally {
+    migrated.close();
+  }
+});
+
 function turn(
   turnId: string,
   completedAtMs: number,
   status: "completed" | "aborted" = "completed",
-  tps = 2.5,
+  effectiveTps = 2.5,
 ) {
   return {
     turnId,
     sessionId: "test-session",
+    provider: "codex" as const,
     startedAtMs: completedAtMs - 5_000,
     completedAtMs,
     durationMs: 5_000,
     ttftMs: 1_000,
     outputTokens: 10,
-    tps,
+    effectiveTps,
     hasTool: false,
     status,
   };

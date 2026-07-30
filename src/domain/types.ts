@@ -1,9 +1,11 @@
 export type TurnStatus = "completed" | "aborted";
+export type Provider = "codex" | "claude";
 
 export interface PendingTurn {
   turnId: string;
   sourcePath: string;
   sessionId: string;
+  provider: Provider;
   startedAtMs: number;
   firstAgentAtMs: number | null;
   outputTokens: number;
@@ -13,12 +15,13 @@ export interface PendingTurn {
 export interface TurnRecord {
   turnId: string;
   sessionId: string;
+  provider: Provider;
   startedAtMs: number;
   completedAtMs: number;
   durationMs: number | null;
   ttftMs: number | null;
   outputTokens: number | null;
-  tps: number | null;
+  effectiveTps: number | null;
   hasTool: boolean;
   status: TurnStatus;
 }
@@ -26,6 +29,7 @@ export interface TurnRecord {
 export interface ActiveTurn {
   turnId: string;
   sessionId: string;
+  provider: Provider;
   startedAtMs: number;
   estimatedTtftMs: number | null;
   hasTool: boolean;
@@ -36,8 +40,8 @@ export interface Summary {
   unavailableCount: number;
   p50TtftMs: number | null;
   p95TtftMs: number | null;
-  p50Tps: number | null;
-  p5Tps: number | null;
+  p50EffectiveTps: number | null;
+  p5EffectiveTps: number | null;
 }
 
 export interface StatusReport {

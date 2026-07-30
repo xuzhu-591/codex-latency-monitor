@@ -3,24 +3,32 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { formatSwiftBar, buildStatus } from "./status.js";
-import { refreshSessions } from "../ingest/ingest.js";
+import { refreshClaudeSessions, refreshSessions } from "../ingest/ingest.js";
 import { writeReport } from "../report/report.js";
 import { MonitorDatabase, defaultDatabasePath } from "../storage/database.js";
 
 export async function runCli(argumentsList: string[], environment = process.env): Promise<string> {
   const command = argumentsList[0] ?? "status";
   const format = valueAfter(argumentsList, "--format") ?? "text";
-  const sessionsDirectory = environment.CODEX_LATENCY_SESSIONS_DIR ?? join(homedir(), ".codex", "sessions");
+  const codexSessionsDirectory = environment.CODEX_LATENCY_SESSIONS_DIR ?? join(homedir(), ".codex", "sessions");
+  const claudeSessionsDirectory = environment.CODEX_LATENCY_CLAUDE_SESSIONS_DIR ?? join(homedir(), ".claude", "projects");
   const dataDirectory = environment.CODEX_LATENCY_DATA_DIR ?? join(homedir(), "Library", "Application Support", "CodexLatencyMonitor");
   await mkdir(dataDirectory, { recursive: true });
   const database = new MonitorDatabase(defaultDatabasePath(dataDirectory));
 
   try {
     if (command === "doctor") {
-      return JSON.stringify(await doctor(sessionsDirectory, dataDirectory), null, 2);
+      return JSON.stringify(await doctor(codexSessionsDirectory, claudeSessionsDirectory, dataDirectory), null, 2);
     }
 
-    const refreshResult = await refreshSessions(database, sessionsDirectory);
+    const [codexRefresh, claudeRefresh] = await Promise.all([
+      refreshSessions(database, codexSessionsDirectory),
+      refreshClaudeSessions(database, claudeSessionsDirectory),
+    ]);
+    const refreshResult = {
+      importedEvents: codexRefresh.importedEvents + claudeRefresh.importedEvents,
+      diagnostics: [...codexRefresh.diagnostics, ...claudeRefresh.diagnostics],
+    };
     const report = buildStatus(database, refreshResult.importedEvents, refreshResult.diagnostics);
     if (command === "refresh") {
       return JSON.stringify({ importedEvents: refreshResult.importedEvents, diagnostics: refreshResult.diagnostics }, null, 2);
@@ -33,7 +41,7 @@ export async function runCli(argumentsList: string[], environment = process.env)
         return JSON.stringify(report, null, 2);
       }
       return report.latest
-        ? `TTFT ${report.latest.ttftMs ?? "N/A"}ms · TPS ${report.latest.tps?.toFixed(1) ?? "N/A"}/s\n`
+        ? `${providerName(report.latest.provider)} · TTFT ${report.latest.ttftMs ?? "N/A"}ms · Effective TPS ${report.latest.effectiveTps?.toFixed(1) ?? "N/A"}/s\n`
         : "暂无完成 Turn\n";
     }
     if (command === "report") {
@@ -49,19 +57,33 @@ export async function runCli(argumentsList: string[], environment = process.env)
   }
 }
 
-async function doctor(sessionsDirectory: string, dataDirectory: string): Promise<Record<string, string>> {
+async function doctor(
+  codexSessionsDirectory: string,
+  claudeSessionsDirectory: string,
+  dataDirectory: string,
+): Promise<Record<string, string>> {
   const result: Record<string, string> = {
     node: process.version,
-    sessionsDirectory,
+    codexSessionsDirectory,
+    claudeSessionsDirectory,
     dataDirectory,
   };
-  try {
-    await access(sessionsDirectory);
-    result.sessions = "ok";
-  } catch {
-    result.sessions = "不可读取";
-  }
+  result.codexSessions = await directoryStatus(codexSessionsDirectory);
+  result.claudeSessions = await directoryStatus(claudeSessionsDirectory, true);
   return result;
+}
+
+async function directoryStatus(path: string, optional = false): Promise<string> {
+  try {
+    await access(path);
+    return "ok";
+  } catch {
+    return optional ? "未发现" : "不可读取";
+  }
+}
+
+function providerName(provider: "codex" | "claude"): string {
+  return provider === "claude" ? "Claude" : "Codex";
 }
 
 function valueAfter(argumentsList: string[], flag: string): string | null {

@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { formatMilliseconds, formatTps } from "../domain/metrics.js";
-import type { StatusReport, TurnRecord } from "../domain/types.js";
+import { formatEffectiveTps, formatMilliseconds } from "../domain/metrics.js";
+import type { Provider, StatusReport, TurnRecord } from "../domain/types.js";
 
 export function writeReport(dataDirectory: string, report: StatusReport): string {
   mkdirSync(dataDirectory, { recursive: true });
@@ -11,36 +11,37 @@ export function writeReport(dataDirectory: string, report: StatusReport): string
 }
 
 function renderReport(report: StatusReport): string {
-  const rows = report.recent.map(renderRow).join("\n") || "<tr><td colspan=\"6\">暂无完成 Turn</td></tr>";
+  const rows = report.recent.map(renderRow).join("\n") || "<tr><td colspan=\"7\">暂无完成 Turn</td></tr>";
   const ttftChart = renderChart("昨日及今日 TTFT 时序", "TTFT", report.trend, (turn) => turn.ttftMs, "#2563eb", formatMilliseconds);
-  const tpsChart = renderChart("昨日及今日 TPS 时序", "TPS", report.trend, (turn) => turn.tps, "#059669", formatTps);
+  const tpsChart = renderChart("昨日及今日 Effective TPS 时序", "Effective TPS", report.trend, (turn) => turn.effectiveTps, "#059669", formatEffectiveTps);
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Codex 延迟报告</title>
+<title>Codex 与 Claude 延迟报告</title>
 <style>
 body { max-width: 960px; margin: 40px auto; padding: 0 20px; font: 14px -apple-system, BlinkMacSystemFont, sans-serif; color: #18212f; }
 h1 { margin-bottom: 8px; } h2 { margin-top: 32px; } .summary { display: flex; flex-wrap: wrap; gap: 14px; margin: 24px 0; } .card { background: #f3f6fb; border-radius: 10px; padding: 14px; min-width: 130px; }
-.charts { display: grid; gap: 18px; } .chart { border: 1px solid #dde3ee; border-radius: 12px; padding: 16px; background: #fff; } .chart h3 { margin: 0 0 12px; font-size: 15px; } .chart-empty { color: #56627a; margin: 20px 0; }
-svg { display: block; width: 100%; height: auto; } .grid { stroke: #e8edf5; stroke-width: 1; } .axis-label { fill: #6a7588; font-size: 11px; } .line { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; } .point { stroke: #fff; stroke-width: 2; pointer-events: none; } .point-hit-area { fill: transparent; cursor: default; } .chart-tooltip { position: fixed; z-index: 1; max-width: calc(100vw - 16px); padding: 7px 10px; border-radius: 7px; background: #18212f; color: #fff; font-size: 12px; line-height: 1.4; pointer-events: none; box-shadow: 0 4px 16px rgb(24 33 47 / 20%); }
+.charts { display: grid; gap: 18px; } .chart { border: 1px solid #dde3ee; border-radius: 12px; padding: 16px; background: #fff; } .chart h3 { margin: 0; font-size: 15px; } .chart-heading { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; margin-bottom: 12px; } .chart-empty { color: #56627a; margin: 20px 0; }
+.chart-legend { display: flex; gap: 12px; color: #56627a; font-size: 12px; white-space: nowrap; } .legend-codex { color: #2563eb; } .legend-claude { color: #d97706; } .provider-badge { font-weight: 600; white-space: nowrap; } .provider-badge.codex { color: #1d4ed8; } .provider-badge.claude { color: #b45309; }
+svg { display: block; width: 100%; height: auto; } .grid { stroke: #e8edf5; stroke-width: 1; } .axis-label { fill: #6a7588; font-size: 11px; } .line { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; } .point { stroke: #fff; stroke-width: 2; pointer-events: none; } .point.codex { fill: #2563eb; } .point.claude { fill: #d97706; } .point-hit-area { fill: transparent; cursor: default; } .chart-tooltip { position: fixed; z-index: 1; max-width: calc(100vw - 16px); padding: 7px 10px; border-radius: 7px; background: #18212f; color: #fff; font-size: 12px; line-height: 1.4; pointer-events: none; box-shadow: 0 4px 16px rgb(24 33 47 / 20%); }
 table { width: 100%; border-collapse: collapse; } th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #dde3ee; } th { color: #56627a; }
 </style>
 </head>
 <body>
-<h1>Codex 本地延迟报告</h1>
+<h1>Codex 与 Claude 本地延迟报告</h1>
 <p>仅包含本机汇总指标，不包含会话正文、工具参数或工作区路径。</p>
 <section class="summary">
   <div class="card">完成 Turn<br><strong>${report.summary.completedCount}</strong></div>
   <div class="card">p50 TTFT<br><strong>${formatMilliseconds(report.summary.p50TtftMs)}</strong></div>
   <div class="card">p95 TTFT<br><strong>${formatMilliseconds(report.summary.p95TtftMs)}</strong></div>
-  <div class="card">p50 TPS<br><strong>${formatTps(report.summary.p50Tps)}</strong></div>
-  <div class="card">p5 TPS<br><strong>${formatTps(report.summary.p5Tps)}</strong></div>
+  <div class="card">p50 Effective TPS<br><strong>${formatEffectiveTps(report.summary.p50EffectiveTps)}</strong></div>
+  <div class="card">p5 Effective TPS<br><strong>${formatEffectiveTps(report.summary.p5EffectiveTps)}</strong></div>
 </section>
 <section class="charts">${ttftChart}${tpsChart}</section>
 <h2>最近 50 轮</h2>
-<table><thead><tr><th>完成时间</th><th>会话 ID</th><th>TTFT</th><th>TPS</th><th>总时长</th><th>工具</th></tr></thead><tbody>${rows}</tbody></table>
+<table><thead><tr><th>完成时间</th><th>来源</th><th>会话 ID</th><th>TTFT</th><th>Effective TPS</th><th>总时长</th><th>工具</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="chart-tooltip" data-chart-tooltip hidden></div>
 <script>
 (() => {
@@ -57,7 +58,7 @@ table { width: 100%; border-collapse: collapse; } th, td { padding: 10px 8px; te
 
   for (const point of document.querySelectorAll("[data-chart-point]")) {
     point.addEventListener("pointerenter", (event) => {
-      tooltip.textContent = point.dataset.time + " · " + point.dataset.metric + " " + point.dataset.value;
+      tooltip.textContent = point.dataset.provider + " · " + point.dataset.time + " · " + point.dataset.metric + " " + point.dataset.value;
       tooltip.hidden = false;
       positionTooltip(event);
     });
@@ -117,18 +118,32 @@ function renderChart(
   }).join("");
   const circles = points.map((point, index) => {
     const { x, y } = coordinate(point, index);
-    const detail = `${formatDateTime(point.turn.completedAtMs)} · ${metricLabel} ${format(point.value)}`;
-    const data = `data-chart-point data-time="${escapeHtml(formatDateTime(point.turn.completedAtMs))}" data-metric="${escapeHtml(metricLabel)}" data-value="${escapeHtml(format(point.value))}"`;
-    return `<circle class="point-hit-area" ${data} cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="10"><title>${escapeHtml(detail)}</title></circle><circle class="point" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${color}"/>`;
+    const provider = providerName(point.turn.provider);
+    const detail = `${provider} · ${formatDateTime(point.turn.completedAtMs)} · ${metricLabel} ${format(point.value)}`;
+    const data = `data-chart-point data-provider="${provider}" data-time="${escapeHtml(formatDateTime(point.turn.completedAtMs))}" data-metric="${escapeHtml(metricLabel)}" data-value="${escapeHtml(format(point.value))}"`;
+    const marker = point.turn.provider === "claude"
+      ? `<polygon class="point claude" points="${x.toFixed(1)},${(y - 5).toFixed(1)} ${(x + 5).toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${(y + 5).toFixed(1)} ${(x - 5).toFixed(1)},${y.toFixed(1)}"/>`
+      : `<circle class="point codex" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"/>`;
+    return `<circle class="point-hit-area" ${data} cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="10"><title>${escapeHtml(detail)}</title></circle>${marker}`;
   }).join("");
   const firstTime = new Date(points[0].turn.completedAtMs).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
   const lastTime = new Date(points.at(-1)?.turn.completedAtMs ?? points[0].turn.completedAtMs).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
 
-  return `<article class="chart"><h3>${title}</h3><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${title}">${grid}<polyline class="line" stroke="${color}" points="${polyline}"/>${circles}<text class="axis-label" x="${left}" y="${height - 8}">${escapeHtml(firstTime)}</text><text class="axis-label" x="${width - right}" y="${height - 8}" text-anchor="end">${escapeHtml(lastTime)}</text></svg></article>`;
+  return `<article class="chart"><div class="chart-heading"><h3>${title}</h3><div class="chart-legend"><span class="legend-codex">● Codex</span><span class="legend-claude">◆ Claude</span></div></div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${title}">${grid}<polyline class="line" stroke="${color}" points="${polyline}"/>${circles}<text class="axis-label" x="${left}" y="${height - 8}">${escapeHtml(firstTime)}</text><text class="axis-label" x="${width - right}" y="${height - 8}" text-anchor="end">${escapeHtml(lastTime)}</text></svg></article>`;
 }
 
 function renderRow(turn: TurnRecord): string {
-  return `<tr><td>${escapeHtml(new Date(turn.completedAtMs).toLocaleString("zh-CN"))}</td><td>${escapeHtml(turn.sessionId)}</td><td>${formatMilliseconds(turn.ttftMs)}</td><td>${formatTps(turn.tps)}</td><td>${formatMilliseconds(turn.durationMs)}</td><td>${turn.hasTool ? "是" : "否"}</td></tr>`;
+  return `<tr><td>${escapeHtml(new Date(turn.completedAtMs).toLocaleString("zh-CN"))}</td><td>${providerBadge(turn.provider)}</td><td>${escapeHtml(turn.sessionId)}</td><td>${formatMilliseconds(turn.ttftMs)}</td><td>${formatEffectiveTps(turn.effectiveTps)}</td><td>${formatMilliseconds(turn.durationMs)}</td><td>${turn.hasTool ? "是" : "否"}</td></tr>`;
+}
+
+function providerBadge(provider: Provider): string {
+  return provider === "claude"
+    ? "<span class=\"provider-badge claude\">◆ Claude</span>"
+    : "<span class=\"provider-badge codex\">● Codex</span>";
+}
+
+function providerName(provider: Provider): string {
+  return provider === "claude" ? "Claude" : "Codex";
 }
 
 function formatDateTime(atMs: number): string {
