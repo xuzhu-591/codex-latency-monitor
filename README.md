@@ -32,7 +32,7 @@ npm run build
 npm run install:swiftbar
 ```
 
-最后一条命令会在 SwiftBar 插件目录创建指向本仓库插件文件的符号链接，不会覆盖已有的同名非本工具插件。SwiftBar 默认每 10 秒刷新一次。
+最后一条命令会在 SwiftBar 插件目录创建受本工具管理的启动器，不会覆盖已有的同名非本工具插件。启动器会固定本次安装使用的 Node.js 路径，因此电脑重启后也不依赖 SwiftBar 的登录环境 `PATH`。如果移动了仓库目录或切换/删除 Node.js 运行时，重新执行该命令即可。SwiftBar 默认每 10 秒刷新一次。
 
 ## 界面
 
