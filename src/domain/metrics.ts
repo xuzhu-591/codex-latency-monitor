@@ -8,7 +8,7 @@ export interface MetricResult {
   durationMs: number | null;
   ttftMs: number | null;
   outputTokens: number | null;
-  effectiveTps: number | null;
+  tps: number | null;
 }
 
 export function calculateMetrics(input: MetricInput): MetricResult {
@@ -19,14 +19,14 @@ export function calculateMetrics(input: MetricInput): MetricResult {
     : null;
 
   if (durationMs === null || outputTokens === null || durationMs <= 0) {
-    return { durationMs, ttftMs, outputTokens, effectiveTps: null };
+    return { durationMs, ttftMs, outputTokens, tps: null };
   }
 
   return {
     durationMs,
     ttftMs,
     outputTokens,
-    effectiveTps: outputTokens / (durationMs / 1_000),
+    tps: outputTokens / (durationMs / 1_000),
   };
 }
 
@@ -51,7 +51,7 @@ export function formatMilliseconds(value: number | null): string {
   return `${(value / 1_000).toFixed(1)}s`;
 }
 
-export function formatEffectiveTps(value: number | null): string {
+export function formatTps(value: number | null): string {
   if (value === null || !Number.isFinite(value)) {
     return "N/A";
   }

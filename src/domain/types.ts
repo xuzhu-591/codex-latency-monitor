@@ -21,7 +21,7 @@ export interface TurnRecord {
   durationMs: number | null;
   ttftMs: number | null;
   outputTokens: number | null;
-  effectiveTps: number | null;
+  tps: number | null;
   hasTool: boolean;
   status: TurnStatus;
 }
@@ -40,8 +40,8 @@ export interface Summary {
   unavailableCount: number;
   p50TtftMs: number | null;
   p95TtftMs: number | null;
-  p50EffectiveTps: number | null;
-  p5EffectiveTps: number | null;
+  p50Tps: number | null;
+  p5Tps: number | null;
 }
 
 export interface StatusReport {
@@ -50,6 +50,7 @@ export interface StatusReport {
   trend: TurnRecord[];
   active: ActiveTurn[];
   summary: Summary;
+  providerSummaries: Record<Provider, Summary>;
   importedEvents: number;
   diagnostics: string[];
 }

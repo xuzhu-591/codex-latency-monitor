@@ -2,7 +2,7 @@
   "name": "codex-latency-monitor",
   "version": "0.1.0",
   "private": true,
-  "description": "被动读取本地 Codex 与 Claude Code 会话日志的 TTFT 与 Effective TPS 监控工具",
+  "description": "被动读取本地 Codex 与 Claude Code 会话日志的 TTFT 与 TPS 监控工具",
   "type": "module",
   "bin": {
     "codex-latency": "bin/codex-latency.mjs"

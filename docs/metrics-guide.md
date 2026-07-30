@@ -7,9 +7,9 @@ Codex Latency Monitor 被动读取本机已完成的 Codex 与 Claude Code Turn�
 | 场景 | 优先看 | 代表什么 |
 | --- | --- | --- |
 | 感觉“等很久才开始回答” | TTFT p50、p95 | 从提交到首个助手输出的等待 |
-| 感觉“这一轮整体很慢” | Effective TPS p50、p5 | 从提交到完成的端到端产出效率 |
-| 偶发卡顿 | TTFT p95 与 p50 的差值；Effective TPS p5 与 p50 的差值 | 少数较差请求是否明显拖慢体验 |
-| 想定位某一次异常 | 时序图与最近 50 轮 | 完成时间、来源、TTFT、Effective TPS 与工具标记 |
+| 感觉“这一轮整体很慢” | TPS p50、p5 | 从提交到完成的端到端产出效率 |
+| 偶发卡顿 | TTFT p95 与 p50 的差值；TPS p5 与 p50 的差值 | 少数较差请求是否明显拖慢体验 |
+| 想定位某一次异常 | 时序图与最近 50 轮 | 完成时间、来源、TTFT、TPS 与工具标记 |
 
 ## 两个基础指标
 
@@ -22,12 +22,12 @@ Codex Latency Monitor 被动读取本机已完成的 Codex 与 Claude Code Turn�
 - Codex 优先使用其完成事件提供的原生首 token 耗时。
 - Claude Code 由本地 JSONL 的首个 `thinking` 或 `text` 助手事件重建，因此是本地体验口径，不是服务端原生 TTFB。
 
-### Effective TPS
+### TPS
 
-**Effective TPS（有效每秒 token 数）** 是从提交问题到 Turn 完成的端到端产出速率，越大越好。
+**TPS（每秒 token 数）** 是从提交问题到 Turn 完成的端到端产出速率，越大越好。
 
 ```text
-Effective TPS = Turn 输出 token 总数 ÷ Turn 总时长
+TPS = Turn 输出 token 总数 ÷ Turn 总时长
 ```
 
 分母从用户提交开始，包含 TTFT、模型思考、网络传输、工具调用及其等待。这样它能反映“我发出问题后，多久拿到多少结果”的真实体感；不会把首包很慢、但收尾很快的 Turn 显示成虚高的 TPS。
@@ -42,7 +42,7 @@ Effective TPS = Turn 输出 token 总数 ÷ Turn 总时长
 | --- | --- | --- |
 | p50 | 中位数；约一半 Turn 优于它，另一半差于它 | 典型体验 |
 | TTFT p95 | 约 95% Turn 的 TTFT 不高于该值 | 较慢的首包等待；TTFT 越高越差，因此看高分位 p95 |
-| Effective TPS p5 | 约 5% Turn 的 Effective TPS 不高于该值 | 较慢的端到端产出；Effective TPS 越低越差，因此看低分位 p5 |
+| TPS p5 | 约 5% Turn 的 TPS 不高于该值 | 较慢的端到端产出；TPS 越低越差，因此看低分位 p5 |
 
 `p5` 不是“5 秒”，`p95` 也不是“95% 的请求失败”。
 
@@ -50,7 +50,7 @@ Effective TPS = Turn 输出 token 总数 ÷ Turn 总时长
 
 ```text
 TTFT p50 6.7s · p95 15.4s
-Effective TPS p50 53.2/s · p5 35.2/s
+TPS p50 53.2/s · p5 35.2/s
 ```
 
 这表示典型 Turn 在约 6.7 秒出现首个助手输出，较慢的 5% 可能接近 15.4 秒；从提交到完成，典型端到端产出约为每秒 53.2 个 token，最慢的一小部分约为每秒 35.2 个 token。
@@ -60,9 +60,9 @@ Effective TPS p50 53.2/s · p5 35.2/s
 一次网络卡顿、长工具等待或超长任务都会显著影响均值，却无法说明多数请求是否正常。因此工具默认展示：
 
 - TTFT 的 p50 + p95：典型首包与慢首包；
-- Effective TPS 的 p50 + p5：典型端到端效率与慢轮次效率。
+- TPS 的 p50 + p5：典型端到端效率与慢轮次效率。
 
-如果 TTFT p95 升高而 Effective TPS 基本稳定，通常是偶发首包等待；如果 Effective TPS p5 降低但 TTFT 稳定，通常是少数 Turn 在思考、输出、网络或工具阶段耗时更长。结合“工具”标记进一步判断，不应直接归因于模型服务或 VPN。
+如果 TTFT p95 升高而 TPS 基本稳定，通常是偶发首包等待；如果 TPS p5 降低但 TTFT 稳定，通常是少数 Turn 在思考、输出、网络或工具阶段耗时更长。结合“工具”标记进一步判断，不应直接归因于模型服务或 VPN。
 
 ## 界面范围
 
@@ -70,7 +70,7 @@ Effective TPS p50 53.2/s · p5 35.2/s
 | --- | --- |
 | SwiftBar 顶部 | 最近完成的一轮；明确标注 Codex 或 Claude |
 | SwiftBar 最近 10 轮 | 最近完成的 10 个 Turn；每轮标注来源 |
-| SwiftBar 当日汇总 | 今天 00:00 至当前的完成 Turn；TTFT p50/p95、Effective TPS p50/p5 |
+| SwiftBar 当日汇总 | 今天 00:00 至当前的完成 Turn；Codex、Claude 分别展示 TTFT p50/p95、TPS p50/p5 |
 | 本地报告汇总卡片 | 今天 00:00 至当前的完成 Turn；与 SwiftBar 当日汇总相同 |
 | 本地报告时序图 | 昨天 00:00 至当前；`● Codex`、`◆ Claude` 区分采样点来源 |
 | 本地报告表格 | 最近 50 个 Turn；显示来源和真实会话 ID |
@@ -79,4 +79,4 @@ Effective TPS p50 53.2/s · p5 35.2/s
 
 ## 使用边界
 
-该工具观察的是本机实际体验，不能单独证明异常发生在 VPN、Codex/Claude 服务端或某个工具上。出现异常时，先按时序图定位时间点，再看来源、TTFT、Effective TPS、工具标记与本机网络状态。
+该工具观察的是本机实际体验，不能单独证明异常发生在 VPN、Codex/Claude 服务端或某个工具上。出现异常时，先按时序图定位时间点，再看来源、TTFT、TPS、工具标记与本机网络状态。

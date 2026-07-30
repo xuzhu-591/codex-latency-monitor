@@ -27,18 +27,20 @@ test("E2E：从 JSONL 到 CLI、SwiftBar 文本和本地报告", async () => {
   };
 
   const status = run([cli, "status", "--format", "json"], childEnvironment);
-  const parsed = JSON.parse(status.stdout) as { latest: { provider: string; ttftMs: number; effectiveTps: number; sessionId: string } };
+  const parsed = JSON.parse(status.stdout) as { latest: { provider: string; ttftMs: number; tps: number; sessionId: string } };
   assert.equal(parsed.latest.provider, "claude");
   assert.equal(parsed.latest.ttftMs, 2_000);
-  assert.equal(parsed.latest.effectiveTps, 1.2);
+  assert.equal(parsed.latest.tps, 1.2);
 
   const swiftbar = run([plugin], childEnvironment);
-  assert.match(swiftbar.stdout, /^Claude · TTFT 2\.0s · Effective TPS 1\.2\/s/m);
-  assert.match(swiftbar.stdout, /Claude · TTFT 2\.0s · Effective TPS 1\.2\/s/);
-  assert.match(swiftbar.stdout, /Codex · TTFT 2\.0s · Effective TPS 2\.0\/s/);
+  assert.match(swiftbar.stdout, /^Claude · TTFT 2\.0s · TPS 1\.2\/s/m);
+  assert.match(swiftbar.stdout, /Claude · TTFT 2\.0s · TPS 1\.2\/s/);
+  assert.match(swiftbar.stdout, /Codex · TTFT 2\.0s · TPS 2\.0\/s/);
   assert.match(swiftbar.stdout, /今天 · 2 轮 \| disabled=true/);
-  assert.match(swiftbar.stdout, /TTFT p50 2\.0s · p95 2\.0s/);
-  assert.match(swiftbar.stdout, /Effective TPS p50 1\.6\/s · p5 1\.2\/s/);
+  assert.match(swiftbar.stdout, /Codex · 1 轮/);
+  assert.match(swiftbar.stdout, /Claude · 1 轮/);
+  assert.match(swiftbar.stdout, /TPS p50 2\.0\/s · p5 2\.0\/s/);
+  assert.match(swiftbar.stdout, /TPS p50 1\.2\/s · p5 1\.2\/s/);
   assert.doesNotMatch(swiftbar.stdout, /N\/A/);
   assert.match(swiftbar.stdout, /打开本地报告/);
   assert.doesNotMatch(swiftbar.stdout, new RegExp(parsed.latest.sessionId));
@@ -47,14 +49,14 @@ test("E2E：从 JSONL 到 CLI、SwiftBar 文本和本地报告", async () => {
   const reportPath = report.stdout.trim();
   const html = await readFile(reportPath, "utf8");
   assert.match(html, /昨日及今日 TTFT 时序/);
-  assert.match(html, /昨日及今日 Effective TPS 时序/);
+  assert.match(html, /昨日及今日 TPS 时序/);
   assert.match(html, /<svg/);
   assert.match(html, /data-chart-tooltip/);
   assert.match(html, /data-chart-point/);
   assert.match(html, /data-metric="TTFT"/);
   assert.match(html, /data-value="2\.0s"/);
   assert.match(html, /pointerenter/);
-  assert.match(html, /p5 Effective TPS/);
+  assert.match(html, /p5 TPS/);
   assert.match(html, /● Codex/);
   assert.match(html, /◆ Claude/);
   assert.match(html, new RegExp(parsed.latest.sessionId));

@@ -172,7 +172,7 @@ function finalizeCodexTurn(
     durationMs: metric.durationMs,
     ttftMs: metric.ttftMs,
     outputTokens: metric.outputTokens,
-    effectiveTps: completed ? metric.effectiveTps : null,
+    tps: completed ? metric.tps : null,
     hasTool: pending.hasTool,
     status: completed ? "completed" : "aborted",
   };
@@ -234,7 +234,7 @@ function finalizeClaudeTurn(database: MonitorDatabase, sourcePath: string, compl
     durationMs: metric.durationMs,
     ttftMs: metric.ttftMs,
     outputTokens: metric.outputTokens,
-    effectiveTps: metric.effectiveTps,
+    tps: metric.tps,
     hasTool: pending.hasTool,
     status: "completed",
   });

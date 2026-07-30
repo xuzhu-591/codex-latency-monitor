@@ -2,7 +2,7 @@
 
 ## 1. 结论
 
-工具在 macOS 上被动读取 Codex 和 Claude Code 已落盘的 JSONL 会话，提供 TTFT 与 Effective TPS。它不向模型服务发起网络请求、不改变两种客户端配置，也不上传会话数据。
+工具在 macOS 上被动读取 Codex 和 Claude Code 已落盘的 JSONL 会话，提供 TTFT 与 TPS。它不向模型服务发起网络请求、不改变两种客户端配置，也不上传会话数据。
 
 技术选型保持为 **TypeScript + Node.js 22、better-sqlite3、静态 HTML 与 SwiftBar**。两个来源使用独立解析适配器，共享指标、持久化和展示层；后续替换 SwiftBar 为原生菜单栏应用时无需重写采集逻辑。
 
@@ -11,9 +11,9 @@
 | 指标 | 计算方式 | 用途 | 边界 |
 | --- | --- | --- | --- |
 | TTFT | 用户提交到首个助手输出 | 定位响应前等待 | Codex 优先原生值；Claude 由本地助手事件重建 |
-| Effective TPS | 输出 token 总数 ÷ 用户提交到完成的总时长 | 反映端到端体感 | 包含 TTFT、工具、网络和思考等待 |
+| TPS | 输出 token 总数 ÷ 用户提交到完成的总时长 | 反映端到端体感 | 包含 TTFT、工具、网络和思考等待 |
 | Duration | 用户提交到完成 | 解释长 Turn | 无完整开始或完成时间时为 `N/A` |
-| Tool flag | 是否观察到工具调用 | 辅助阅读 | 不从 Effective TPS 分母扣除 |
+| Tool flag | 是否观察到工具调用 | 辅助阅读 | 不从 TPS 分母扣除 |
 
 本地日志没有可靠的逐 token 流式到达时间，因此不实现“纯输出 TPS”。缺失数据一律展示 `N/A`，绝不使用 `0`。
 
@@ -53,7 +53,7 @@ flowchart LR
 
 每个源文件保存已确认的字节位置，仅解析追加的完整 JSON 行；不完整尾行留待下次刷新。文件截断后从头读取，稳定 Turn ID 保证已完成记录不会重复统计。
 
-升级到 Effective TPS 时，已有完成 Turn 自动按其保留的总时长和输出 token 重新计算一次。Codex 历史记录默认标记为 Codex，避免历史数据在报告中失去来源。
+升级到端到端 TPS 时，已有完成 Turn 自动按其保留的总时长和输出 token 重新计算一次。Codex 历史记录默认标记为 Codex，避免历史数据在报告中失去来源。
 
 Claude 会话目录不存在时视为“尚未使用 Claude Code”，不显示错误，也不影响 Codex 刷新。未知事件与缺少必要字段的 Turn 保留为不可计算状态，不污染分位数汇总。
 
@@ -62,10 +62,10 @@ Claude 会话目录不存在时视为“尚未使用 Claude Code”，不显示�
 SwiftBar 每 10 秒执行一次 CLI，CLI 先刷新两种来源再输出：
 
 ```text
-Codex · TTFT 2.8s · Effective TPS 12.5/s
+Codex · TTFT 2.8s · TPS 12.5/s
 ```
 
-最近 10 轮均附带来源名称。当天汇总把可计算的 Completed Turn 汇总为 TTFT p50/p95、Effective TPS p50/p5；缺少 TTFT 或 Effective TPS 的 Turn 显示在 `N/A` 计数中。
+最近 10 轮均附带来源名称。当天汇总分别展示 Codex 与 Claude 的 Completed Turn 数、TTFT p50/p95、TPS p50/p5；缺少 TTFT 或 TPS 的 Turn 显示在对应来源的 `N/A` 计数中。
 
 HTML 报告显示昨天零点至当前的两条时序图和最近 50 轮。折线按指标着色，采样点按来源显示 `● Codex` 或 `◆ Claude`；鼠标悬停显示来源、完成时间和对应数值。
 
@@ -81,10 +81,10 @@ HTML 报告显示昨天零点至当前的两条时序图和最近 50 轮。折�
 
 | 层级 | 覆盖内容 |
 | --- | --- |
-| 单元测试 | Effective TPS 的端到端分母、缺失值和分位数边界 |
+| 单元测试 | TPS 的端到端分母、缺失值和分位数边界 |
 | 集成测试 | Codex 增量与工具等待、Claude 用户消息/工具循环/`end_turn`、消息 ID 去重、子代理与边车排除、来源图标与隐私 |
 | 端到端测试 | 临时 JSONL → CLI JSON → SwiftBar 文本 → HTML 报告；验证最新来源、两个来源的列表、图表标记和悬停数据属性 |
-| 升级验证 | 以旧格式本地数据库启动，确认历史 TPS 自动切换为 Effective TPS 口径 |
+| 升级验证 | 以旧格式本地数据库启动，确认历史 TPS 自动切换为端到端口径 |
 
 质量门禁：
 
