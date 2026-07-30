@@ -4,6 +4,7 @@ import { realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 const pluginPath = realpathSync(new URL(import.meta.url));
+const launcherPath = process.env.CODEX_LATENCY_SWIFTBAR_LAUNCHER ?? pluginPath;
 const root = resolve(dirname(pluginPath), "..");
 const command = resolve(root, "bin/codex-latency.mjs");
 const action = process.argv[2] ?? "status";
@@ -15,7 +16,7 @@ try {
   } else {
     const output = execFileSync(process.execPath, [command, "status", "--format", "swiftbar"], { encoding: "utf8" });
     process.stdout.write(output);
-    process.stdout.write(`---\n打开本地报告 | bash=${pluginPath} param1=report terminal=false\n`);
+    process.stdout.write(`---\n打开本地报告 | bash=${launcherPath} param1=report terminal=false\n`);
   }
 } catch (error) {
   const message = error instanceof Error ? error.message.replace(/[\r\n|]/g, " ") : "未知错误";
