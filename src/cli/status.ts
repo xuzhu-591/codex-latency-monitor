@@ -9,11 +9,12 @@ export function buildStatus(
   nowMs = Date.now(),
 ): StatusReport {
   const recent = database.listRecent(50);
+  const latest = recent.find((turn) => turn.status === "completed") ?? null;
   const completedToday = database.listCompletedSince(startOfLocalDay(nowMs));
   const trend = database.listCompletedSince(startOfPreviousLocalDay(nowMs))
     .filter((turn) => turn.status === "completed" && turn.completedAtMs <= nowMs);
   return {
-    latest: recent[0] ?? null,
+    latest,
     recent,
     trend,
     active: database.listActive(nowMs),

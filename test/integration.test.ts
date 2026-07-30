@@ -76,6 +76,23 @@ test("趋势图仅包含昨天零点至当前的完成 Turn", async () => {
   }
 });
 
+test("状态栏跳过最近的中止 Turn，展示上一条正常完成结果", async () => {
+  const environment = await createTestEnvironment("codex-latency-latest-completed");
+  const database = new MonitorDatabase(defaultDatabasePath(environment.data));
+  try {
+    const now = Date.now();
+    database.completeTurn(turn("completed-turn", now - 1_000));
+    database.completeTurn(turn("aborted-turn", now, "aborted"));
+
+    const report = buildStatus(database, 0, [], now);
+    assert.equal(report.recent[0]?.turnId, "aborted-turn");
+    assert.equal(report.latest?.turnId, "completed-turn");
+    assert.match(formatSwiftBar(report), /^Codex · TTFT 1\.0s · TPS 2\.5\/s/m);
+  } finally {
+    database.close();
+  }
+});
+
 test("菜单栏按来源展示当天汇总与 N/A 数量", () => {
   const text = formatSwiftBar({
     latest: null,
