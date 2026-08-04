@@ -14,6 +14,7 @@ export class MonitorDatabase {
     this.#database.pragma("foreign_keys = ON");
     this.#migrate();
     this.#migrateProvider();
+    this.#migrateModel();
     this.#migrateTps();
     this.#migrateSessionIds();
   }
@@ -48,12 +49,45 @@ export class MonitorDatabase {
     startedAtMs: number,
     provider: Provider = "codex",
     explicitSessionId = codexSessionId(sourcePath),
+    model: string | null = null,
   ): void {
     this.#database.prepare(`
-      INSERT INTO pending_turns (turn_id, source_path, session_key, provider, started_at_ms)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO pending_turns (turn_id, source_path, session_key, provider, model, started_at_ms)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(turn_id) DO NOTHING
-    `).run(turnId, sourcePath, explicitSessionId, provider, startedAtMs);
+    `).run(turnId, sourcePath, explicitSessionId, provider, model, startedAtMs);
+  }
+
+  getSourceModel(sourcePath: string): string | null {
+    const row = this.#database.prepare("SELECT model FROM source_models WHERE source_path = ?")
+      .get(sourcePath) as { model: string } | undefined;
+    return row?.model ?? null;
+  }
+
+  setSourceModel(sourcePath: string, model: string | null): void {
+    if (model === null) {
+      return;
+    }
+    this.#database.prepare(`
+      INSERT INTO source_models (source_path, model)
+      VALUES (?, ?)
+      ON CONFLICT(source_path) DO UPDATE SET model = excluded.model
+    `).run(sourcePath, model);
+  }
+
+  setLatestPendingModel(sourcePath: string, model: string | null): void {
+    if (model === null) {
+      return;
+    }
+    this.#database.prepare(`
+      UPDATE pending_turns
+      SET model = ?
+      WHERE turn_id = (
+        SELECT turn_id FROM pending_turns
+        WHERE source_path = ?
+        ORDER BY started_at_ms DESC LIMIT 1
+      )
+    `).run(model, sourcePath);
   }
 
   markFirstAgentEvent(sourcePath: string, atMs: number): void {
@@ -140,8 +174,8 @@ export class MonitorDatabase {
     this.#database.prepare(`
       INSERT INTO turns (
         turn_id, session_key, started_at_ms, completed_at_ms, duration_ms,
-        ttft_ms, output_tokens, tps, has_tool, status, provider
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ttft_ms, output_tokens, tps, has_tool, status, provider, model
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(turn_id) DO UPDATE SET
         session_key = excluded.session_key,
         started_at_ms = excluded.started_at_ms,
@@ -152,7 +186,8 @@ export class MonitorDatabase {
         tps = excluded.tps,
         has_tool = excluded.has_tool,
         status = excluded.status,
-        provider = excluded.provider
+        provider = excluded.provider,
+        model = excluded.model
     `).run(
       record.turnId,
       record.sessionId,
@@ -165,6 +200,7 @@ export class MonitorDatabase {
       Number(record.hasTool),
       record.status,
       record.provider,
+      record.model,
     );
     this.#database.prepare("DELETE FROM pending_turns WHERE turn_id = ?").run(record.turnId);
     this.#database.prepare("DELETE FROM message_token_usage WHERE turn_id = ?").run(record.turnId);
@@ -186,13 +222,14 @@ export class MonitorDatabase {
 
   listActive(nowMs: number): ActiveTurn[] {
     const rows = this.#database.prepare(`
-      SELECT turn_id, session_key, provider, started_at_ms, first_agent_at_ms, has_tool
+      SELECT turn_id, session_key, provider, model, started_at_ms, first_agent_at_ms, has_tool
       FROM pending_turns ORDER BY started_at_ms DESC
     `).all() as PendingRow[];
     return rows.map((row) => ({
       turnId: row.turn_id,
       sessionId: row.session_key,
       provider: row.provider,
+      model: row.model,
       startedAtMs: row.started_at_ms,
       estimatedTtftMs: row.first_agent_at_ms === null ? null : Math.max(0, row.first_agent_at_ms - row.started_at_ms),
       hasTool: Boolean(row.has_tool),
@@ -211,6 +248,7 @@ export class MonitorDatabase {
         source_path TEXT NOT NULL,
         session_key TEXT NOT NULL,
         provider TEXT NOT NULL DEFAULT 'codex' CHECK(provider IN ('codex', 'claude')),
+        model TEXT,
         started_at_ms INTEGER NOT NULL,
         first_agent_at_ms INTEGER,
         output_tokens INTEGER NOT NULL DEFAULT 0,
@@ -229,7 +267,8 @@ export class MonitorDatabase {
         tps REAL,
         has_tool INTEGER NOT NULL,
         status TEXT NOT NULL CHECK(status IN ('completed', 'aborted')),
-        provider TEXT NOT NULL DEFAULT 'codex' CHECK(provider IN ('codex', 'claude'))
+        provider TEXT NOT NULL DEFAULT 'codex' CHECK(provider IN ('codex', 'claude')),
+        model TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_turns_completed
         ON turns(completed_at_ms DESC);
@@ -238,6 +277,10 @@ export class MonitorDatabase {
         message_id TEXT NOT NULL,
         output_tokens INTEGER NOT NULL,
         PRIMARY KEY (turn_id, message_id)
+      );
+      CREATE TABLE IF NOT EXISTS source_models (
+        source_path TEXT PRIMARY KEY,
+        model TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS monitor_metadata (
         key TEXT PRIMARY KEY,
@@ -249,6 +292,26 @@ export class MonitorDatabase {
   #migrateProvider(): void {
     this.#ensureColumn("pending_turns", "provider", "TEXT NOT NULL DEFAULT 'codex'");
     this.#ensureColumn("turns", "provider", "TEXT NOT NULL DEFAULT 'codex'");
+  }
+
+  #migrateModel(): void {
+    this.#ensureColumn("pending_turns", "model", "TEXT");
+    this.#ensureColumn("turns", "model", "TEXT");
+    const row = this.#database.prepare("SELECT value FROM monitor_metadata WHERE key = 'turn_model'")
+      .get() as { value: string } | undefined;
+    if (row?.value === "v1") {
+      return;
+    }
+    this.#database.transaction(() => {
+      this.#database.prepare("UPDATE source_files SET offset_bytes = 0").run();
+      this.#database.prepare("DELETE FROM source_models").run();
+      this.#database.prepare("DELETE FROM pending_turns").run();
+      this.#database.prepare("DELETE FROM message_token_usage").run();
+      this.#database.prepare(`
+        INSERT INTO monitor_metadata (key, value) VALUES ('turn_model', 'v1')
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+      `).run();
+    })();
   }
 
   #migrateTps(): void {
@@ -320,6 +383,7 @@ interface PendingRow {
   source_path: string;
   session_key: string;
   provider: Provider;
+  model: string | null;
   started_at_ms: number;
   first_agent_at_ms: number | null;
   output_tokens: number;
@@ -330,6 +394,7 @@ interface TurnRow {
   turn_id: string;
   session_key: string;
   provider: Provider;
+  model: string | null;
   started_at_ms: number;
   completed_at_ms: number;
   duration_ms: number | null;
@@ -346,6 +411,7 @@ function mapPending(row: PendingRow): PendingTurn {
     sourcePath: row.source_path,
     sessionId: row.session_key,
     provider: row.provider,
+    model: row.model,
     startedAtMs: row.started_at_ms,
     firstAgentAtMs: row.first_agent_at_ms,
     outputTokens: row.output_tokens,
@@ -358,6 +424,7 @@ function mapTurn(row: TurnRow): TurnRecord {
     turnId: row.turn_id,
     sessionId: row.session_key,
     provider: row.provider,
+    model: row.model,
     startedAtMs: row.started_at_ms,
     completedAtMs: row.completed_at_ms,
     durationMs: row.duration_ms,

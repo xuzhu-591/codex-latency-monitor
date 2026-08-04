@@ -6,6 +6,7 @@ export interface PendingTurn {
   sourcePath: string;
   sessionId: string;
   provider: Provider;
+  model: string | null;
   startedAtMs: number;
   firstAgentAtMs: number | null;
   outputTokens: number;
@@ -16,6 +17,7 @@ export interface TurnRecord {
   turnId: string;
   sessionId: string;
   provider: Provider;
+  model: string | null;
   startedAtMs: number;
   completedAtMs: number;
   durationMs: number | null;
@@ -30,6 +32,7 @@ export interface ActiveTurn {
   turnId: string;
   sessionId: string;
   provider: Provider;
+  model: string | null;
   startedAtMs: number;
   estimatedTtftMs: number | null;
   hasTool: boolean;
@@ -44,13 +47,19 @@ export interface Summary {
   p5Tps: number | null;
 }
 
+export interface ModelSummary {
+  provider: Provider;
+  model: string | null;
+  summary: Summary;
+}
+
 export interface StatusReport {
   latest: TurnRecord | null;
   recent: TurnRecord[];
   trend: TurnRecord[];
   active: ActiveTurn[];
   summary: Summary;
-  providerSummaries: Record<Provider, Summary>;
+  modelSummaries: ModelSummary[];
   importedEvents: number;
   diagnostics: string[];
 }

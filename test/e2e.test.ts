@@ -27,22 +27,24 @@ test("E2E：从 JSONL 到 CLI、SwiftBar 文本和本地报告", async () => {
   };
 
   const status = run([cli, "status", "--format", "json"], childEnvironment);
-  const parsed = JSON.parse(status.stdout) as { latest: { provider: string; ttftMs: number; tps: number; sessionId: string } };
+  const parsed = JSON.parse(status.stdout) as { latest: { provider: string; model: string; ttftMs: number; tps: number; sessionId: string } };
   assert.equal(parsed.latest.provider, "claude");
   assert.equal(parsed.latest.ttftMs, 2_000);
   assert.equal(parsed.latest.tps, 1.2);
+  assert.equal(parsed.latest.model, "claude-opus-4-8");
 
   const swiftbar = run([plugin], childEnvironment);
-  assert.match(swiftbar.stdout, /^Claude · TTFT 2\.0s · TPS 1\.2\/s/m);
-  assert.match(swiftbar.stdout, /Claude · TTFT 2\.0s · TPS 1\.2\/s/);
-  assert.match(swiftbar.stdout, /Codex · TTFT 2\.0s · TPS 2\.0\/s/);
+  assert.match(swiftbar.stdout, /^cc · claude-opus-4-8$/m);
+  assert.match(swiftbar.stdout, /cc · claude-opus-4-8/);
+  assert.match(swiftbar.stdout, /cx · gpt-5\.6-sol/);
   assert.match(swiftbar.stdout, /今天 · 2 轮 \| disabled=true/);
-  assert.match(swiftbar.stdout, /Codex · 1 轮/);
-  assert.match(swiftbar.stdout, /Claude · 1 轮/);
+  assert.match(swiftbar.stdout, /cx · gpt-5\.6-sol · 1 轮/);
+  assert.match(swiftbar.stdout, /cc · claude-opus-4-8 · 1 轮/);
   assert.match(swiftbar.stdout, /TPS p50 2\.0\/s · p5 2\.0\/s/);
   assert.match(swiftbar.stdout, /TPS p50 1\.2\/s · p5 1\.2\/s/);
   assert.doesNotMatch(swiftbar.stdout, /N\/A/);
   assert.match(swiftbar.stdout, /打开本地报告/);
+  assert.doesNotMatch(swiftbar.stdout.split("\n---\n今天")[0], /TTFT|TPS/);
   assert.doesNotMatch(swiftbar.stdout, new RegExp(parsed.latest.sessionId));
 
   const report = run([cli, "report"], childEnvironment);
@@ -56,9 +58,12 @@ test("E2E：从 JSONL 到 CLI、SwiftBar 文本和本地报告", async () => {
   assert.match(html, /data-metric="TTFT"/);
   assert.match(html, /data-value="2\.0s"/);
   assert.match(html, /pointerenter/);
-  assert.match(html, /p5 TPS/);
-  assert.match(html, /● Codex/);
-  assert.match(html, /◆ Claude/);
+  assert.match(html, /TPS p50 1\.2\/s · p5 1\.2\/s/);
+  assert.match(html, /● cx/);
+  assert.match(html, /◆ cc/);
+  assert.match(html, /<th>模型<\/th>/);
+  assert.match(html, /gpt-5\.6-sol/);
+  assert.match(html, /claude-opus-4-8/);
   assert.match(html, new RegExp(parsed.latest.sessionId));
   assert.doesNotMatch(html, new RegExp(privateText));
 });

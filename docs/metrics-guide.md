@@ -9,7 +9,7 @@ Codex Latency Monitor 被动读取本机已完成的 Codex 与 Claude Code Turn�
 | 感觉“等很久才开始回答” | TTFT p50、p95 | 从提交到首个助手输出的等待 |
 | 感觉“这一轮整体很慢” | TPS p50、p5 | 从提交到完成的端到端产出效率 |
 | 偶发卡顿 | TTFT p95 与 p50 的差值；TPS p5 与 p50 的差值 | 少数较差请求是否明显拖慢体验 |
-| 想定位某一次异常 | 时序图与最近 50 轮 | 完成时间、来源、TTFT、TPS 与工具标记 |
+| 想定位某一次异常 | 时序图与最近 50 轮 | 完成时间、来源、模型、TTFT、TPS 与工具标记 |
 
 ## 两个基础指标
 
@@ -68,14 +68,14 @@ TPS p50 53.2/s · p5 35.2/s
 
 | 位置 | 数据范围 |
 | --- | --- |
-| SwiftBar 顶部 | 最近完成的一轮；明确标注 Codex 或 Claude |
-| SwiftBar 最近 10 轮 | 最近完成的 10 个 Turn；每轮标注来源 |
-| SwiftBar 当日汇总 | 今天 00:00 至当前的完成 Turn；Codex、Claude 分别展示 TTFT p50/p95、TPS p50/p5 |
-| 本地报告汇总卡片 | 今天 00:00 至当前的完成 Turn；与 SwiftBar 当日汇总相同 |
-| 本地报告时序图 | 昨天 00:00 至当前；`● Codex`、`◆ Claude` 区分采样点来源 |
-| 本地报告表格 | 最近 50 个 Turn；显示来源和真实会话 ID |
+| SwiftBar 顶部 | 最近完成的一轮；显示 `cx`（Codex）或 `cc`（Claude Code）及模型，不显示 TTFT/TPS |
+| SwiftBar 最近 10 轮 | 最近完成的 10 个 Turn；每轮显示来源、模型与工具标记，不显示 TTFT/TPS |
+| SwiftBar 当日汇总 | 今天 00:00 至当前的完成 Turn；按“来源 + 模型”展示 TTFT p50/p95、TPS p50/p5 |
+| 本地报告汇总卡片 | 今天 00:00 至当前的完成 Turn；按“来源 + 模型”展示 TTFT/TPS 分位数 |
+| 本地报告时序图 | 昨天 00:00 至当前；`● cx`、`◆ cc` 和悬停提示区分来源与模型 |
+| 本地报告表格 | 最近 50 个 Turn；显示来源、模型和真实会话 ID |
 
-某个 Turn 缺少 TTFT、总时长或输出 token 时，相应指标显示 `N/A`，绝不以 `0` 代替。Claude 的工具结果、压缩摘要、边车事件与 `subagents/` 日志不会被当作新的用户 Turn。
+某个 Turn 缺少模型、TTFT、总时长或输出 token 时，相应字段显示 `N/A`，绝不以 `0` 代替。模型取 Codex Turn 上下文或 Claude 最终助手消息；升级后会回放本机 JSONL 补齐历史轮次。Claude 的工具结果、压缩摘要、边车事件与 `subagents/` 日志不会被当作新的用户 Turn。
 
 ## 使用边界
 

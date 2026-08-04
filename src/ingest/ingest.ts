@@ -110,13 +110,14 @@ async function ingestFile(
 function applyCodexEvent(database: MonitorDatabase, sourcePath: string, event: LogEvent): void {
   const eventType = getCodexEventType(event);
   const atMs = timestampMs(event.timestamp);
+  database.setSourceModel(sourcePath, codexModel(event));
   if (!eventType || atMs === null) {
     return;
   }
   const turnId = getTurnId(event);
 
   if (eventType === "task_started" && turnId) {
-    database.startTurn(turnId, sourcePath, atMs);
+    database.startTurn(turnId, sourcePath, atMs, "codex", undefined, database.getSourceModel(sourcePath));
     return;
   }
 
@@ -167,6 +168,7 @@ function finalizeCodexTurn(
     turnId,
     sessionId: pending.sessionId,
     provider: pending.provider,
+    model: pending.model,
     startedAtMs: pending.startedAtMs,
     completedAtMs,
     durationMs: metric.durationMs,
@@ -201,6 +203,7 @@ function applyClaudeEvent(database: MonitorDatabase, sourcePath: string, event: 
   }
 
   const contentTypes = claudeContentTypes(message);
+  database.setLatestPendingModel(sourcePath, stringAt(message, ["model"]));
   if (contentTypes.includes("thinking") || contentTypes.includes("text")) {
     database.markFirstAgentEvent(sourcePath, atMs);
   }
@@ -229,6 +232,7 @@ function finalizeClaudeTurn(database: MonitorDatabase, sourcePath: string, compl
     turnId: pending.turnId,
     sessionId: pending.sessionId,
     provider: pending.provider,
+    model: pending.model,
     startedAtMs: pending.startedAtMs,
     completedAtMs,
     durationMs: metric.durationMs,
@@ -296,6 +300,11 @@ function getCodexEventType(event: LogEvent): string | null {
     return "custom_tool_call";
   }
   return payloadType;
+}
+
+function codexModel(event: LogEvent): string | null {
+  const payload = event.payload ?? {};
+  return stringAt(payload, ["model"]) ?? stringAt(payload, ["thread_settings", "model"]);
 }
 
 function getTurnId(event: LogEvent): string | null {

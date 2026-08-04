@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { formatMilliseconds, formatTps } from "../domain/metrics.js";
-import type { Provider, StatusReport, TurnRecord } from "../domain/types.js";
+import type { ModelSummary, Provider, StatusReport, TurnRecord } from "../domain/types.js";
 
 export function writeReport(dataDirectory: string, report: StatusReport): string {
   mkdirSync(dataDirectory, { recursive: true });
@@ -11,7 +11,7 @@ export function writeReport(dataDirectory: string, report: StatusReport): string
 }
 
 function renderReport(report: StatusReport): string {
-  const rows = report.recent.map(renderRow).join("\n") || "<tr><td colspan=\"7\">暂无完成 Turn</td></tr>";
+  const rows = report.recent.map(renderRow).join("\n") || "<tr><td colspan=\"8\">暂无完成 Turn</td></tr>";
   const ttftChart = renderChart("昨日及今日 TTFT 时序", "TTFT", report.trend, (turn) => turn.ttftMs, "#2563eb", formatMilliseconds);
   const tpsChart = renderChart("昨日及今日 TPS 时序", "TPS", report.trend, (turn) => turn.tps, "#059669", formatTps);
   return `<!doctype html>
@@ -33,15 +33,11 @@ table { width: 100%; border-collapse: collapse; } th, td { padding: 10px 8px; te
 <h1>Codex 与 Claude 本地延迟报告</h1>
 <p>仅包含本机汇总指标，不包含会话正文、工具参数或工作区路径。</p>
 <section class="summary">
-  <div class="card">完成 Turn<br><strong>${report.summary.completedCount}</strong></div>
-  <div class="card">p50 TTFT<br><strong>${formatMilliseconds(report.summary.p50TtftMs)}</strong></div>
-  <div class="card">p95 TTFT<br><strong>${formatMilliseconds(report.summary.p95TtftMs)}</strong></div>
-  <div class="card">p50 TPS<br><strong>${formatTps(report.summary.p50Tps)}</strong></div>
-  <div class="card">p5 TPS<br><strong>${formatTps(report.summary.p5Tps)}</strong></div>
+  ${renderModelSummaryCards(report.modelSummaries)}
 </section>
 <section class="charts">${ttftChart}${tpsChart}</section>
 <h2>最近 50 轮</h2>
-<table><thead><tr><th>完成时间</th><th>来源</th><th>会话 ID</th><th>TTFT</th><th>TPS</th><th>总时长</th><th>工具</th></tr></thead><tbody>${rows}</tbody></table>
+<table><thead><tr><th>完成时间</th><th>来源</th><th>模型</th><th>会话 ID</th><th>TTFT</th><th>TPS</th><th>总时长</th><th>工具</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="chart-tooltip" data-chart-tooltip hidden></div>
 <script>
 (() => {
@@ -58,7 +54,7 @@ table { width: 100%; border-collapse: collapse; } th, td { padding: 10px 8px; te
 
   for (const point of document.querySelectorAll("[data-chart-point]")) {
     point.addEventListener("pointerenter", (event) => {
-      tooltip.textContent = point.dataset.provider + " · " + point.dataset.time + " · " + point.dataset.metric + " " + point.dataset.value;
+      tooltip.textContent = point.dataset.provider + " · " + point.dataset.model + " · " + point.dataset.time + " · " + point.dataset.metric + " " + point.dataset.value;
       tooltip.hidden = false;
       positionTooltip(event);
     });
@@ -70,6 +66,13 @@ table { width: 100%; border-collapse: collapse; } th, td { padding: 10px 8px; te
 })();
 </script>
 </body></html>`;
+}
+
+function renderModelSummaryCards(summaries: ModelSummary[]): string {
+  if (summaries.length === 0) {
+    return "<div class=\"card\">完成 Turn<br><strong>0</strong></div>";
+  }
+  return summaries.map(({ provider, model, summary }) => `<div class="card">${providerBadge(provider)} · ${escapeHtml(modelName(model))}<br><strong>${summary.completedCount} 轮</strong><br>TTFT p50 ${formatMilliseconds(summary.p50TtftMs)} · p95 ${formatMilliseconds(summary.p95TtftMs)}<br>TPS p50 ${formatTps(summary.p50Tps)} · p5 ${formatTps(summary.p5Tps)}</div>`).join("\n");
 }
 
 function renderChart(
@@ -119,8 +122,9 @@ function renderChart(
   const circles = points.map((point, index) => {
     const { x, y } = coordinate(point, index);
     const provider = providerName(point.turn.provider);
-    const detail = `${provider} · ${formatDateTime(point.turn.completedAtMs)} · ${metricLabel} ${format(point.value)}`;
-    const data = `data-chart-point data-provider="${provider}" data-time="${escapeHtml(formatDateTime(point.turn.completedAtMs))}" data-metric="${escapeHtml(metricLabel)}" data-value="${escapeHtml(format(point.value))}"`;
+    const model = modelName(point.turn.model);
+    const detail = `${provider} · ${model} · ${formatDateTime(point.turn.completedAtMs)} · ${metricLabel} ${format(point.value)}`;
+    const data = `data-chart-point data-provider="${provider}" data-model="${escapeHtml(model)}" data-time="${escapeHtml(formatDateTime(point.turn.completedAtMs))}" data-metric="${escapeHtml(metricLabel)}" data-value="${escapeHtml(format(point.value))}"`;
     const marker = point.turn.provider === "claude"
       ? `<polygon class="point claude" points="${x.toFixed(1)},${(y - 5).toFixed(1)} ${(x + 5).toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${(y + 5).toFixed(1)} ${(x - 5).toFixed(1)},${y.toFixed(1)}"/>`
       : `<circle class="point codex" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"/>`;
@@ -129,21 +133,25 @@ function renderChart(
   const firstTime = new Date(points[0].turn.completedAtMs).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
   const lastTime = new Date(points.at(-1)?.turn.completedAtMs ?? points[0].turn.completedAtMs).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
 
-  return `<article class="chart"><div class="chart-heading"><h3>${title}</h3><div class="chart-legend"><span class="legend-codex">● Codex</span><span class="legend-claude">◆ Claude</span></div></div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${title}">${grid}<polyline class="line" stroke="${color}" points="${polyline}"/>${circles}<text class="axis-label" x="${left}" y="${height - 8}">${escapeHtml(firstTime)}</text><text class="axis-label" x="${width - right}" y="${height - 8}" text-anchor="end">${escapeHtml(lastTime)}</text></svg></article>`;
+  return `<article class="chart"><div class="chart-heading"><h3>${title}</h3><div class="chart-legend"><span class="legend-codex">● cx</span><span class="legend-claude">◆ cc</span></div></div><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${title}">${grid}<polyline class="line" stroke="${color}" points="${polyline}"/>${circles}<text class="axis-label" x="${left}" y="${height - 8}">${escapeHtml(firstTime)}</text><text class="axis-label" x="${width - right}" y="${height - 8}" text-anchor="end">${escapeHtml(lastTime)}</text></svg></article>`;
 }
 
 function renderRow(turn: TurnRecord): string {
-  return `<tr><td>${escapeHtml(new Date(turn.completedAtMs).toLocaleString("zh-CN"))}</td><td>${providerBadge(turn.provider)}</td><td>${escapeHtml(turn.sessionId)}</td><td>${formatMilliseconds(turn.ttftMs)}</td><td>${formatTps(turn.tps)}</td><td>${formatMilliseconds(turn.durationMs)}</td><td>${turn.hasTool ? "是" : "否"}</td></tr>`;
+  return `<tr><td>${escapeHtml(new Date(turn.completedAtMs).toLocaleString("zh-CN"))}</td><td>${providerBadge(turn.provider)}</td><td>${escapeHtml(modelName(turn.model))}</td><td>${escapeHtml(turn.sessionId)}</td><td>${formatMilliseconds(turn.ttftMs)}</td><td>${formatTps(turn.tps)}</td><td>${formatMilliseconds(turn.durationMs)}</td><td>${turn.hasTool ? "是" : "否"}</td></tr>`;
 }
 
 function providerBadge(provider: Provider): string {
   return provider === "claude"
-    ? "<span class=\"provider-badge claude\">◆ Claude</span>"
-    : "<span class=\"provider-badge codex\">● Codex</span>";
+    ? "<span class=\"provider-badge claude\">◆ cc</span>"
+    : "<span class=\"provider-badge codex\">● cx</span>";
 }
 
 function providerName(provider: Provider): string {
-  return provider === "claude" ? "Claude" : "Codex";
+  return provider === "claude" ? "cc" : "cx";
+}
+
+function modelName(model: string | null): string {
+  return model ?? "N/A";
 }
 
 function formatDateTime(atMs: number): string {
