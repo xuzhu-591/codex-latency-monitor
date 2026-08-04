@@ -62,10 +62,10 @@ Claude 会话目录不存在时视为“尚未使用 Claude Code”，不显示�
 SwiftBar 每 10 秒通过安装时生成的 POSIX 启动器执行插件；启动器固定本次安装的 Node.js 运行时，避免 GUI 登录环境缺少 `PATH` 中的 Node。插件再调用 CLI，CLI 先刷新两种来源再输出：
 
 ```text
-cx · gpt-5.6-sol
+cx · gpt-5.6-sol · 7.8s · 21.2/s
 ```
 
-最近 10 轮只显示 `cx`/`cc`、模型与工具标记。当天汇总按“来源 + 模型”分组展示 Completed Turn 数、TTFT p50/p95、TPS p50/p5；缺少模型、TTFT 或 TPS 的 Turn 显示为 `N/A`。模型升级后重置本地读取偏移并回放 JSONL，以补齐历史轮次。
+最近 10 轮显示 `cx`/`cc`、模型、TTFT/TPS 数值与工具标记，但不重复展示指标名。当天汇总按“来源 + 模型”分组展示 Completed Turn 数、TTFT p50/p95、TPS p50/p5；缺少模型、TTFT 或 TPS 的 Turn 显示为 `N/A`。模型升级后重置本地读取偏移并回放 JSONL，以补齐历史轮次。
 
 HTML 报告显示昨天零点至当前的两条时序图和最近 50 轮。折线按指标着色，采样点按来源显示 `● cx` 或 `◆ cc`；鼠标悬停显示来源、模型、完成时间和对应数值。
 

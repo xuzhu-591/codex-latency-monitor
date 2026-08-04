@@ -86,7 +86,7 @@ function headline(latest: TurnRecord | null): string {
   if (!latest) {
     return "cx · 等待完成 Turn";
   }
-  return `${providerName(latest.provider)} · ${modelName(latest.model)}`;
+  return `${providerName(latest.provider)} · ${modelName(latest.model)} · ${formatMilliseconds(latest.ttftMs)} · ${formatTps(latest.tps)}`;
 }
 
 function formatTurn(turn: TurnRecord): string {
@@ -96,8 +96,10 @@ function formatTurn(turn: TurnRecord): string {
     hour12: false,
   });
   const tool = turn.hasTool ? " · 工具" : "";
-  const state = turn.status === "aborted" ? " · 中止" : "";
-  return `${completedAt} · ${providerName(turn.provider)} · ${modelName(turn.model)}${state}${tool} | disabled=true`;
+  const result = turn.status === "aborted"
+    ? " · 中止"
+    : ` · ${formatMilliseconds(turn.ttftMs)} · ${formatTps(turn.tps)}`;
+  return `${completedAt} · ${providerName(turn.provider)} · ${modelName(turn.model)}${result}${tool} | disabled=true`;
 }
 
 function providerName(provider: Provider): string {

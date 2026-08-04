@@ -89,13 +89,17 @@ test("状态栏跳过最近的中止 Turn，展示上一条正常完成结果", 
     const report = buildStatus(database, 0, [], now);
     assert.equal(report.recent[0]?.turnId, "aborted-turn");
     assert.equal(report.latest?.turnId, "completed-turn");
-    assert.match(formatSwiftBar(report), /^cx · gpt-5\.6-sol$/m);
+    const menu = formatSwiftBar(report);
+    assert.match(menu, /^cx · gpt-5\.6-sol · 1\.0s · 2\.5\/s$/m);
+    const recent = menu.split("最近 10 轮 | disabled=true\n")[1]?.split("---")[0] ?? "";
+    assert.match(recent, /cx · gpt-5\.6-sol · 1\.0s · 2\.5\/s/);
+    assert.doesNotMatch(recent, /TTFT|TPS/);
   } finally {
     database.close();
   }
 });
 
-test("菜单栏按模型展示当天汇总，轮次列表不展示 TTFT 或 TPS", () => {
+test("菜单栏按模型展示当天汇总，轮次仅保留未标注的 TTFT 和 TPS 数值", () => {
   const text = formatSwiftBar({
     latest: null,
     recent: [],

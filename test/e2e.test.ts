@@ -34,9 +34,9 @@ test("E2E：从 JSONL 到 CLI、SwiftBar 文本和本地报告", async () => {
   assert.equal(parsed.latest.model, "claude-opus-4-8");
 
   const swiftbar = run([plugin], childEnvironment);
-  assert.match(swiftbar.stdout, /^cc · claude-opus-4-8$/m);
-  assert.match(swiftbar.stdout, /cc · claude-opus-4-8/);
-  assert.match(swiftbar.stdout, /cx · gpt-5\.6-sol/);
+  assert.match(swiftbar.stdout, /^cc · claude-opus-4-8 · 2\.0s · 1\.2\/s$/m);
+  assert.match(swiftbar.stdout, /cc · claude-opus-4-8 · 2\.0s · 1\.2\/s/);
+  assert.match(swiftbar.stdout, /cx · gpt-5\.6-sol · 2\.0s · 2\.0\/s/);
   assert.match(swiftbar.stdout, /今天 · 2 轮 \| disabled=true/);
   assert.match(swiftbar.stdout, /cx · gpt-5\.6-sol · 1 轮/);
   assert.match(swiftbar.stdout, /cc · claude-opus-4-8 · 1 轮/);
