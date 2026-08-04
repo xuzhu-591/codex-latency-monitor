@@ -68,8 +68,8 @@ TPS p50 53.2/s · p5 35.2/s
 
 | 位置 | 数据范围 |
 | --- | --- |
-| SwiftBar 顶部 | 最近完成的一轮；显示 `cx`（Codex）或 `cc`（Claude Code）及模型，不显示 TTFT/TPS |
-| SwiftBar 最近 10 轮 | 最近完成的 10 个 Turn；每轮显示来源、模型与工具标记，不显示 TTFT/TPS |
+| SwiftBar 顶部 | 最近完成的一轮；显示 `cx`（Codex）或 `cc`（Claude Code）、模型、TTFT 与 TPS 数值，但不重复显示指标名 |
+| SwiftBar 最近 10 轮 | 最近完成的 10 个 Turn；每轮显示来源、模型、TTFT/TPS 数值与工具标记，但不重复显示指标名 |
 | SwiftBar 当日汇总 | 今天 00:00 至当前的完成 Turn；按“来源 + 模型”展示 TTFT p50/p95、TPS p50/p5 |
 | 本地报告汇总卡片 | 今天 00:00 至当前的完成 Turn；按“来源 + 模型”展示 TTFT/TPS 分位数 |
 | 本地报告时序图 | 昨天 00:00 至当前；`● cx`、`◆ cc` 和悬停提示区分来源与模型 |
