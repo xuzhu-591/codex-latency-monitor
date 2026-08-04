@@ -16,7 +16,7 @@ test("增量导入、部分行重试和重复刷新不会重复统计", async ()
   const database = new MonitorDatabase(defaultDatabasePath(environment.data));
   try {
     const first = await refreshSessions(database, environment.sessions);
-    assert.equal(first.importedEvents, 4);
+    assert.equal(first.importedEvents, 5);
     assert.equal(buildStatus(database, first.importedEvents, []).recent.length, 1);
 
     const second = await refreshSessions(database, environment.sessions);
@@ -28,7 +28,7 @@ test("增量导入、部分行重试和重复刷新不会重复统计", async ()
     await appendRaw(environment.log, partialFirstLine);
     assert.equal((await refreshSessions(database, environment.sessions)).importedEvents, 0);
     await appendRaw(environment.log, `${nextTurn[0].slice(-10)}\n${nextTurn.slice(1).join("\n")}\n`);
-    assert.equal((await refreshSessions(database, environment.sessions)).importedEvents, 4);
+    assert.equal((await refreshSessions(database, environment.sessions)).importedEvents, 5);
     assert.equal(buildStatus(database, 0, []).recent.length, 2);
   } finally {
     database.close();
@@ -39,6 +39,7 @@ test("工具 Turn 的 TPS 包含全部等待，报告不泄露消息正文", asy
   const environment = await createTestEnvironment("codex-latency-privacy");
   const secret = "fixture-secret-must-not-persist";
   await writeLines(environment.log, [
+    event("2026-07-01T00:00:00.000Z", "turn_context", { model: "gpt-5.6-terra" }),
     event("2026-07-01T00:00:00.000Z", "event_msg", { type: "task_started", turn_id: "tool-turn" }),
     event("2026-07-01T00:00:01.000Z", "event_msg", { type: "agent_message", message: secret }),
     event("2026-07-01T00:00:02.000Z", "response_item", { type: "custom_tool_call", internal_chat_message_metadata_passthrough: { turn_id: "tool-turn" }, input: secret }),
@@ -50,6 +51,7 @@ test("工具 Turn 的 TPS 包含全部等待，报告不泄露消息正文", asy
     await refreshSessions(database, environment.sessions);
     const report = buildStatus(database, 0, []);
     assert.equal(report.latest?.hasTool, true);
+    assert.equal(report.latest?.model, "gpt-5.6-terra");
     assert.equal(report.latest?.tps, 20 / 11);
     const path = writeReport(environment.data, report);
     assert.doesNotMatch(await readFile(path, "utf8"), new RegExp(secret));
@@ -87,13 +89,13 @@ test("状态栏跳过最近的中止 Turn，展示上一条正常完成结果", 
     const report = buildStatus(database, 0, [], now);
     assert.equal(report.recent[0]?.turnId, "aborted-turn");
     assert.equal(report.latest?.turnId, "completed-turn");
-    assert.match(formatSwiftBar(report), /^Codex · TTFT 1\.0s · TPS 2\.5\/s/m);
+    assert.match(formatSwiftBar(report), /^cx · gpt-5\.6-sol$/m);
   } finally {
     database.close();
   }
 });
 
-test("菜单栏按来源展示当天汇总与 N/A 数量", () => {
+test("菜单栏按模型展示当天汇总，轮次列表不展示 TTFT 或 TPS", () => {
   const text = formatSwiftBar({
     latest: null,
     recent: [],
@@ -107,8 +109,11 @@ test("菜单栏按来源展示当天汇总与 N/A 数量", () => {
       p50Tps: 10,
       p5Tps: 5,
     },
-    providerSummaries: {
-      codex: {
+    modelSummaries: [
+      {
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        summary: {
         completedCount: 2,
         unavailableCount: 1,
         p50TtftMs: 2_000,
@@ -116,7 +121,11 @@ test("菜单栏按来源展示当天汇总与 N/A 数量", () => {
         p50Tps: 10,
         p5Tps: 5,
       },
-      claude: {
+      },
+      {
+        provider: "claude",
+        model: "claude-opus-4-8",
+        summary: {
         completedCount: 1,
         unavailableCount: 0,
         p50TtftMs: 3_000,
@@ -124,16 +133,17 @@ test("菜单栏按来源展示当天汇总与 N/A 数量", () => {
         p50Tps: 8,
         p5Tps: 8,
       },
-    },
+      },
+    ],
     importedEvents: 0,
     diagnostics: [],
   });
 
   assert.match(text, /今天 · 3 轮/);
-  assert.match(text, /Codex · 2 轮 · N\/A 1/);
+  assert.match(text, /cx · gpt-5\.6-sol · 2 轮 · N\/A 1/);
   assert.match(text, /TTFT p50 2\.0s · p95 4\.0s/);
   assert.match(text, /TPS p50 10\.0\/s · p5 5\.0\/s/);
-  assert.match(text, /Claude · 1 轮/);
+  assert.match(text, /cc · claude-opus-4-8 · 1 轮/);
   assert.match(text, /TTFT p50 3\.0s · p95 3\.0s/);
   assert.match(text, /TPS p50 8\.0\/s · p5 8\.0\/s/);
 });
@@ -224,17 +234,17 @@ test("Claude 主会话按用户输入重建 Turn，排除工具结果、子代�
     claudeEvent(new Date(startedAtMs + 2_000).toISOString(), "assistant", {
       sessionId,
       uuid: "assistant-thinking-1",
-      message: { role: "assistant", id: "thinking-1", content: [{ type: "thinking" }], usage: { output_tokens: 0 } },
+      message: { role: "assistant", id: "thinking-1", model: "claude-opus-4-8", content: [{ type: "thinking" }], usage: { output_tokens: 0 } },
     }),
     claudeEvent(new Date(startedAtMs + 4_000).toISOString(), "assistant", {
       sessionId,
       uuid: "assistant-tool-1",
-      message: { role: "assistant", id: "tool-1", content: [{ type: "tool_use" }], usage: { output_tokens: 3 }, stop_reason: "tool_use" },
+      message: { role: "assistant", id: "tool-1", model: "claude-opus-4-8", content: [{ type: "tool_use" }], usage: { output_tokens: 3 }, stop_reason: "tool_use" },
     }),
     claudeEvent(new Date(startedAtMs + 5_000).toISOString(), "assistant", {
       sessionId,
       uuid: "assistant-tool-2",
-      message: { role: "assistant", id: "tool-1", content: [{ type: "tool_use" }], usage: { output_tokens: 5 }, stop_reason: "tool_use" },
+      message: { role: "assistant", id: "tool-1", model: "claude-opus-4-8", content: [{ type: "tool_use" }], usage: { output_tokens: 5 }, stop_reason: "tool_use" },
     }),
     claudeEvent(new Date(startedAtMs + 6_000).toISOString(), "user", {
       sessionId,
@@ -244,7 +254,7 @@ test("Claude 主会话按用户输入重建 Turn，排除工具结果、子代�
     claudeEvent(new Date(startedAtMs + 10_000).toISOString(), "assistant", {
       sessionId,
       uuid: "assistant-answer-1",
-      message: { role: "assistant", id: "answer-1", content: [{ type: "text" }], usage: { output_tokens: 20 }, stop_reason: "end_turn" },
+      message: { role: "assistant", id: "answer-1", model: "claude-opus-4-8", content: [{ type: "text" }], usage: { output_tokens: 20 }, stop_reason: "end_turn" },
     }),
     claudeEvent(new Date(startedAtMs + 11_000).toISOString(), "user", {
       sessionId,
@@ -274,6 +284,7 @@ test("Claude 主会话按用户输入重建 Turn，排除工具结果、子代�
       turnId: `claude:${sessionId}:user-event-1`,
       sessionId,
       provider: "claude",
+      model: "claude-opus-4-8",
       startedAtMs,
       completedAtMs: startedAtMs + 10_000,
       durationMs: 10_000,
@@ -285,7 +296,7 @@ test("Claude 主会话按用户输入重建 Turn，排除工具结果、子代�
     });
     const reportPath = writeReport(environment.data, report);
     const html = await readFile(reportPath, "utf8");
-    assert.match(html, /◆ Claude/);
+    assert.match(html, /◆ cc/);
     assert.doesNotMatch(html, new RegExp(secret));
   } finally {
     database.close();
@@ -327,6 +338,26 @@ test("已有历史 Turn 在升级后重新计算 TPS", async () => {
   }
 });
 
+test("模型升级会重置偏移量，供历史 JSONL 回放补齐模型", async () => {
+  const environment = await createTestEnvironment("codex-latency-model-migration");
+  const databasePath = defaultDatabasePath(environment.data);
+  const initial = new MonitorDatabase(databasePath);
+  initial.saveOffset(environment.log, 123);
+  initial.close();
+
+  const legacy = new Database(databasePath);
+  legacy.prepare("DELETE FROM monitor_metadata WHERE key = 'turn_model'").run();
+  legacy.close();
+
+  const migrated = new MonitorDatabase(databasePath);
+  try {
+    assert.equal(migrated.getOffset(environment.log), 0);
+    assert.equal(migrated.getSourceModel(environment.log), null);
+  } finally {
+    migrated.close();
+  }
+});
+
 function turn(
   turnId: string,
   completedAtMs: number,
@@ -337,6 +368,7 @@ function turn(
     turnId,
     sessionId: "test-session",
     provider: "codex" as const,
+    model: "gpt-5.6-sol",
     startedAtMs: completedAtMs - 5_000,
     completedAtMs,
     durationMs: 5_000,

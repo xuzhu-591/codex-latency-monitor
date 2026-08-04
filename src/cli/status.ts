@@ -1,5 +1,5 @@
 import { formatMilliseconds, formatTps, percentile } from "../domain/metrics.js";
-import type { Provider, StatusReport, Summary, TurnRecord } from "../domain/types.js";
+import type { ModelSummary, Provider, StatusReport, Summary, TurnRecord } from "../domain/types.js";
 import { MonitorDatabase } from "../storage/database.js";
 
 export function buildStatus(
@@ -19,10 +19,7 @@ export function buildStatus(
     trend,
     active: database.listActive(nowMs),
     summary: summarize(completedToday),
-    providerSummaries: {
-      codex: summarize(completedToday.filter((turn) => turn.provider === "codex")),
-      claude: summarize(completedToday.filter((turn) => turn.provider === "claude")),
-    },
+    modelSummaries: summarizeByModel(completedToday),
     importedEvents,
     diagnostics,
   };
@@ -33,8 +30,7 @@ export function formatSwiftBar(report: StatusReport): string {
 
   if (report.active.length > 0) {
     const active = report.active[0];
-    const estimate = active.estimatedTtftMs === null ? "尚未出现首个助手事件" : `预估 TTFT ${formatMilliseconds(active.estimatedTtftMs)}`;
-    lines.push(`进行中 · ${providerName(active.provider)} · ${estimate} | color=orange`);
+    lines.push(`进行中 · ${providerName(active.provider)} · ${modelName(active.model)} | color=orange`);
   }
 
   lines.push("最近 10 轮 | disabled=true");
@@ -49,8 +45,9 @@ export function formatSwiftBar(report: StatusReport): string {
 
   lines.push("---");
   lines.push(`今天 · ${report.summary.completedCount} 轮 | disabled=true`);
-  appendProviderSummary(lines, "codex", report.providerSummaries.codex);
-  appendProviderSummary(lines, "claude", report.providerSummaries.claude);
+  for (const entry of report.modelSummaries) {
+    appendModelSummary(lines, entry);
+  }
   if (report.diagnostics.length > 0) {
     lines.push("---");
     lines.push(`诊断：${escapeMenuText(report.diagnostics[0])} | color=red`);
@@ -72,11 +69,24 @@ function summarize(turns: TurnRecord[]): Summary {
   };
 }
 
+function summarizeByModel(turns: TurnRecord[]): ModelSummary[] {
+  const groups = new Map<string, { provider: Provider; model: string | null; turns: TurnRecord[] }>();
+  for (const turn of turns) {
+    const key = `${turn.provider}\u0000${turn.model ?? ""}`;
+    const group = groups.get(key) ?? { provider: turn.provider, model: turn.model, turns: [] };
+    group.turns.push(turn);
+    groups.set(key, group);
+  }
+  return [...groups.values()]
+    .map((group) => ({ provider: group.provider, model: group.model, summary: summarize(group.turns) }))
+    .sort((left, right) => providerOrder(left.provider) - providerOrder(right.provider) || modelName(left.model).localeCompare(modelName(right.model)));
+}
+
 function headline(latest: TurnRecord | null): string {
   if (!latest) {
-    return "Codex · 等待完成 Turn";
+    return "cx · 等待完成 Turn";
   }
-  return `${providerName(latest.provider)} · TTFT ${formatMilliseconds(latest.ttftMs)} · TPS ${formatTps(latest.tps)}`;
+  return `${providerName(latest.provider)} · ${modelName(latest.model)}`;
 }
 
 function formatTurn(turn: TurnRecord): string {
@@ -86,22 +96,29 @@ function formatTurn(turn: TurnRecord): string {
     hour12: false,
   });
   const tool = turn.hasTool ? " · 工具" : "";
-  const state = turn.status === "aborted"
-    ? "中止"
-    : `TTFT ${formatMilliseconds(turn.ttftMs)} · TPS ${formatTps(turn.tps)}`;
-  return `${completedAt} · ${providerName(turn.provider)} · ${state}${tool} | disabled=true`;
+  const state = turn.status === "aborted" ? " · 中止" : "";
+  return `${completedAt} · ${providerName(turn.provider)} · ${modelName(turn.model)}${state}${tool} | disabled=true`;
 }
 
 function providerName(provider: Provider): string {
-  return provider === "claude" ? "Claude" : "Codex";
+  return provider === "claude" ? "cc" : "cx";
 }
 
-function appendProviderSummary(lines: string[], provider: Provider, summary: Summary): void {
+function providerOrder(provider: Provider): number {
+  return provider === "codex" ? 0 : 1;
+}
+
+function modelName(model: string | null): string {
+  return model === null ? "N/A" : escapeMenuText(model);
+}
+
+function appendModelSummary(lines: string[], entry: ModelSummary): void {
+  const { provider, model, summary } = entry;
   if (summary.completedCount === 0) {
     return;
   }
   const unavailable = summary.unavailableCount === 0 ? "" : ` · N/A ${summary.unavailableCount}`;
-  lines.push(`${providerName(provider)} · ${summary.completedCount} 轮${unavailable} | disabled=true`);
+  lines.push(`${providerName(provider)} · ${modelName(model)} · ${summary.completedCount} 轮${unavailable} | disabled=true`);
   lines.push(`TTFT p50 ${formatMilliseconds(summary.p50TtftMs)} · p95 ${formatMilliseconds(summary.p95TtftMs)} | disabled=true`);
   lines.push(`TPS p50 ${formatTps(summary.p50Tps)} · p5 ${formatTps(summary.p5Tps)} | disabled=true`);
 }

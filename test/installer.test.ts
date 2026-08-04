@@ -35,7 +35,7 @@ test("安装器生成不依赖 PATH 的 SwiftBar 启动器，并迁移旧版链�
     },
   });
   assert.equal(execution.status, 0, execution.stderr);
-  assert.match(execution.stdout, /^Codex · 等待完成 Turn/m);
+  assert.match(execution.stdout, /^cx · 等待完成 Turn/m);
   assert.match(execution.stdout, new RegExp(`bash=${escapeForRegex(target)} param1=report`));
 
   runInstaller(directory);

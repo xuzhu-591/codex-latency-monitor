@@ -26,8 +26,13 @@ export function event(timestamp: string, type: string, payload: Record<string, u
   return JSON.stringify({ timestamp, type, payload });
 }
 
-export function completedTurnLines(turnId = "turn-complete", startedAtMs = Date.parse("2026-07-01T00:00:00.000Z")): string[] {
+export function completedTurnLines(
+  turnId = "turn-complete",
+  startedAtMs = Date.parse("2026-07-01T00:00:00.000Z"),
+  model = "gpt-5.6-sol",
+): string[] {
   return [
+    event(new Date(startedAtMs).toISOString(), "turn_context", { model }),
     event(new Date(startedAtMs).toISOString(), "event_msg", { type: "task_started", turn_id: turnId }),
     event(new Date(startedAtMs + 2_000).toISOString(), "event_msg", { type: "agent_reasoning" }),
     event(new Date(startedAtMs + 3_000).toISOString(), "event_msg", { type: "token_count", info: { last_token_usage: { output_tokens: 20 } } }),
@@ -48,12 +53,12 @@ export function completedClaudeTurnLines(
     claudeEvent(new Date(startedAtMs + 2_000).toISOString(), "assistant", {
       sessionId,
       uuid: "assistant-thinking-1",
-      message: { role: "assistant", id: "thinking-1", content: [{ type: "thinking" }], usage: { output_tokens: 0 } },
+      message: { role: "assistant", id: "thinking-1", model: "claude-opus-4-8", content: [{ type: "thinking" }], usage: { output_tokens: 0 } },
     }),
     claudeEvent(new Date(startedAtMs + 10_000).toISOString(), "assistant", {
       sessionId,
       uuid: "assistant-answer-1",
-      message: { role: "assistant", id: "answer-1", content: [{ type: "text" }], usage: { output_tokens: 12 }, stop_reason: "end_turn" },
+      message: { role: "assistant", id: "answer-1", model: "claude-opus-4-8", content: [{ type: "text" }], usage: { output_tokens: 12 }, stop_reason: "end_turn" },
     }),
   ];
 }
